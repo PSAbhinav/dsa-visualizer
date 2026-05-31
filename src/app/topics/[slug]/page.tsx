@@ -158,7 +158,48 @@ export default function TopicDetailPage() {
     }
   });
 
-  // Redirect to sign in if not authenticated
+  const selectedAlgorithm = topic?.algorithms[selectedAlgoIndex] ?? topic?.algorithms[0];
+  const availableImplementations = selectedAlgorithm?.code ?? [];
+  const activeImplementation =
+    availableImplementations.find((impl) => impl.language === selectedLanguage) ?? availableImplementations[0];
+  const explanationPoints = (topic?.detailedExplanation ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const tabTransition = { duration: 0.35, ease: "easeOut" as const };
+  const languageIcons: Record<ProgrammingLanguage, string> = {
+    python: "🐍",
+    java: "☕",
+    cpp: "<>",
+    javascript: "{}",
+    go: "🐹",
+  };
+  const videoSectionViewed = (topicProgress?.videosWatched.length ?? 0) > 0;
+  const quizUnlocked = Boolean(topicProgress?.visualizerViewed) && Boolean(topicProgress?.algorithmRead);
+  const quizPassed = (topicProgress?.quizScore ?? 0) >= QUIZ_PASS_SCORE;
+  const tabs = [
+    { id: "visual" as const, label: "Visual", description: "Interactive walkthrough", completed: Boolean(topicProgress?.visualizerViewed) },
+    { id: "videos" as const, label: "Videos", description: "Curated watch list", completed: videoSectionViewed },
+    { id: "algorithm" as const, label: "Algorithm", description: "Pseudocode & code", completed: Boolean(topicProgress?.algorithmRead) },
+    { id: "quiz" as const, label: "Quiz", description: "Practice & score", completed: quizPassed },
+  ];
+
+  // useEffect must be called before any conditional returns (Rules of Hooks)
+  useEffect(() => {
+    if (!topic || status !== "authenticated") {
+      return;
+    }
+
+    if (activeTab === "visual") {
+      markVisualizerViewed();
+    }
+
+    if (activeTab === "algorithm") {
+      markAlgorithmRead();
+    }
+  }, [activeTab, markAlgorithmRead, markVisualizerViewed, topic, status]);
+
+  // Auth loading state
   if (status === "loading") {
     return (
       <PageTransition>
@@ -176,6 +217,7 @@ export default function TopicDetailPage() {
     );
   }
 
+  // Auth required
   if (status === "unauthenticated") {
     return (
       <PageTransition>
@@ -223,46 +265,7 @@ export default function TopicDetailPage() {
     );
   }
 
-  const selectedAlgorithm = topic?.algorithms[selectedAlgoIndex] ?? topic?.algorithms[0];
-  const availableImplementations = selectedAlgorithm?.code ?? [];
-  const activeImplementation =
-    availableImplementations.find((impl) => impl.language === selectedLanguage) ?? availableImplementations[0];
-  const explanationPoints = (topic?.detailedExplanation ?? "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const tabTransition = { duration: 0.35, ease: "easeOut" as const };
-  const languageIcons: Record<ProgrammingLanguage, string> = {
-    python: "🐍",
-    java: "☕",
-    cpp: "<>",
-    javascript: "{}",
-    go: "🐹",
-  };
-  const videoSectionViewed = (topicProgress?.videosWatched.length ?? 0) > 0;
-  const quizUnlocked = Boolean(topicProgress?.visualizerViewed) && Boolean(topicProgress?.algorithmRead);
-  const quizPassed = (topicProgress?.quizScore ?? 0) >= QUIZ_PASS_SCORE;
-  const tabs = [
-    { id: "visual" as const, label: "Visual", description: "Interactive walkthrough", completed: Boolean(topicProgress?.visualizerViewed) },
-    { id: "videos" as const, label: "Videos", description: "Curated watch list", completed: videoSectionViewed },
-    { id: "algorithm" as const, label: "Algorithm", description: "Pseudocode & code", completed: Boolean(topicProgress?.algorithmRead) },
-    { id: "quiz" as const, label: "Quiz", description: "Practice & score", completed: quizPassed },
-  ];
-
-  useEffect(() => {
-    if (!topic) {
-      return;
-    }
-
-    if (activeTab === "visual") {
-      markVisualizerViewed();
-    }
-
-    if (activeTab === "algorithm") {
-      markAlgorithmRead();
-    }
-  }, [activeTab, markAlgorithmRead, markVisualizerViewed, topic]);
-
+  // Topic not found
   if (!topic) {
     return (
       <PageTransition>

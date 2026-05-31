@@ -55,7 +55,53 @@ export default function TopicQuizPage() {
   const startedAtRef = useRef(0);
   const hasRecordedAttemptRef = useRef(false);
 
-  // Auth check - show loading or sign in prompt
+  const currentQuestion = quiz?.questions[currentIndex];
+  const submittedAnswer = submittedAnswers[currentIndex] ?? null;
+  const quizUnlocked = Boolean(topicProgress?.visualizerViewed) && Boolean(topicProgress?.algorithmRead);
+  const score = useMemo(() => {
+    if (!quiz) return 0;
+    return Math.round(
+      (submittedAnswers.filter((answer, index) => answer === quiz.questions[index]?.correctAnswer).length /
+        quiz.questions.length) *
+        100
+    );
+  }, [quiz, submittedAnswers]);
+
+  // All useEffects MUST be before conditional returns (Rules of Hooks)
+  useEffect(() => {
+    if (!quiz || isComplete || status !== "authenticated") {
+      return;
+    }
+
+    if (startedAtRef.current === 0) {
+      startedAtRef.current = Date.now();
+    }
+
+    const timerId = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [isComplete, quiz, status]);
+
+  useEffect(() => {
+    if (!isComplete || !topic || !quiz || hasRecordedAttemptRef.current || status !== "authenticated") {
+      return;
+    }
+
+    hasRecordedAttemptRef.current = true;
+    const calculatedScore = Math.round((submittedAnswers.filter((answer, index) => answer === quiz.questions[index]?.correctAnswer).length / quiz.questions.length) * 100);
+
+    recordQuizAttempt({
+      topicSlug: topic.slug,
+      score: calculatedScore,
+      totalQuestions: quiz.questions.length,
+      timeTaken: finalTime,
+      attemptedAt: new Date().toISOString(),
+    });
+  }, [finalTime, isComplete, quiz, recordQuizAttempt, submittedAnswers, topic, status]);
+
+  // Auth loading state
   if (status === "loading") {
     return (
       <PageTransition>
@@ -69,6 +115,7 @@ export default function TopicQuizPage() {
     );
   }
 
+  // Auth required
   if (status === "unauthenticated") {
     return (
       <PageTransition>
@@ -92,51 +139,6 @@ export default function TopicQuizPage() {
       </PageTransition>
     );
   }
-
-  useEffect(() => {
-    if (!quiz || isComplete) {
-      return;
-    }
-
-    if (startedAtRef.current === 0) {
-      startedAtRef.current = Date.now();
-    }
-
-    const timerId = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
-    }, 1000);
-
-    return () => window.clearInterval(timerId);
-  }, [isComplete, quiz]);
-
-  useEffect(() => {
-    if (!isComplete || !topic || !quiz || hasRecordedAttemptRef.current) {
-      return;
-    }
-
-    hasRecordedAttemptRef.current = true;
-    const score = Math.round((submittedAnswers.filter((answer, index) => answer === quiz.questions[index]?.correctAnswer).length / quiz.questions.length) * 100);
-
-    recordQuizAttempt({
-      topicSlug: topic.slug,
-      score,
-      totalQuestions: quiz.questions.length,
-      timeTaken: finalTime,
-      attemptedAt: new Date().toISOString(),
-    });
-  }, [finalTime, isComplete, quiz, recordQuizAttempt, submittedAnswers, topic]);
-
-  const currentQuestion = quiz?.questions[currentIndex];
-  const submittedAnswer = submittedAnswers[currentIndex] ?? null;
-  const quizUnlocked = Boolean(topicProgress?.visualizerViewed) && Boolean(topicProgress?.algorithmRead);
-  const score = useMemo(() => {
-    if (!quiz) {
-      return 0;
-    }
-
-    const correctAnswers = submittedAnswers.filter((answer, index) => answer === quiz.questions[index]?.correctAnswer).length;
-    return Math.round((correctAnswers / quiz.questions.length) * 100);
-  }, [quiz, submittedAnswers]);
 
   const handleSubmit = () => {
     if (selectedAnswer === null || !quiz) {
