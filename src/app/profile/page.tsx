@@ -2,168 +2,166 @@
 
 import { motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-  FiAward,
-  FiBarChart2,
-  FiCalendar,
-  FiCheckCircle,
-  FiClock,
-  FiEdit3,
-  FiSettings,
-  FiTarget,
-  FiTrendingUp,
-} from "react-icons/fi";
+import { FiBarChart2, FiCalendar, FiClock, FiRefreshCcw, FiTarget, FiTrendingUp } from "react-icons/fi";
 import { HiMiniFire } from "react-icons/hi2";
+import LearningPath from "@/components/dashboard/LearningPath";
+import NextTopicCard from "@/components/dashboard/NextTopicCard";
+import { StreakCalendar } from "@/components/profile/StreakCalendar";
+import { TopicProgressCard } from "@/components/profile/TopicProgressCard";
 import { levels, topics } from "@/data/topics";
+import { calculateTopicCompletion, formatLearningTime, getMilestoneMessage, isTopicMastered } from "@/hooks/useProgressTracker";
+import {
+  buildLearningNotifications,
+  buildLearningPathModel,
+  estimateCurrentLevelCompletionMinutes,
+  formatDuration,
+  getRecommendedTopics,
+  getWeakAreasToRevisit,
+} from "@/lib/recommendationEngine";
 import { useStore } from "@/store/useStore";
 
 const glassCardClass =
   "rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur-2xl shadow-[0_20px_80px_-30px_rgba(168,85,247,0.45)]";
 
 const sectionVariants = {
-  hidden: { opacity: 0, y: 28 },
+  hidden: { opacity: 0, y: 24 },
   visible: (index: number) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.55, delay: index * 0.12, ease: "easeOut" as const },
+    transition: { duration: 0.45, delay: index * 0.08, ease: "easeOut" as const },
   }),
 };
 
-function formatDate(date: Date) {
+const toDateKey = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+function formatDate(value?: string) {
+  if (!value) {
+    return "—";
+  }
+
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(date);
-}
-
-function ProgressRing({ value }: { value: number }) {
-  const safeValue = Math.min(100, Math.max(0, value));
-  const circumference = 2 * Math.PI * 54;
-  const strokeDashoffset = circumference - (safeValue / 100) * circumference;
-
-  return (
-    <div className="relative h-36 w-36">
-      <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
-        <circle
-          cx="60"
-          cy="60"
-          r="54"
-          fill="none"
-          stroke="rgba(255,255,255,0.08)"
-          strokeWidth="10"
-        />
-        <motion.circle
-          cx="60"
-          cy="60"
-          r="54"
-          fill="none"
-          stroke="url(#progressGradient)"
-          strokeWidth="10"
-          strokeLinecap="round"
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
-          style={{ strokeDasharray: circumference }}
-        />
-        <defs>
-          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#c084fc" />
-            <stop offset="100%" stopColor="#8b5cf6" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-4xl font-semibold text-white">{safeValue}%</span>
-        <span className="mt-1 text-xs uppercase tracking-[0.3em] text-purple-200/70">complete</span>
-      </div>
-    </div>
-  );
+  }).format(new Date(value));
 }
 
 export default function ProfilePage() {
   const { data: session } = useSession();
-  const { selectedLevel, completedTopics, problemHistory, resetProgress } = useStore();
-  const [streakDays] = useState(3);
+  const {
+    selectedLevel,
+    completedTopics,
+    topicProgress,
+    learningStats,
+    dailyStreak,
+    activityLog,
+    problemHistory,
+    conceptMastery,
+    resetProgress,
+  } = useStore();
+  const [memberSince] = useState(() => {
+    const seededDate = new Date();
+    seededDate.setDate(seededDate.getDate() - 30);
+    return seededDate;
+  });
 
-  const visibleTopics = useMemo(
-    () => (selectedLevel ? topics.filter((topic) => topic.level === selectedLevel) : topics),
-    [selectedLevel]
+  const topicLookup = useMemo(() => new Map(topics.map((topic) => [topic.slug, topic])), []);
+  const topicTitlesBySlug = useMemo(
+    () => Object.fromEntries(topics.map((topic) => [topic.slug, topic.title])),
+    []
   );
 
-  const completedCount = useMemo(
-    () => completedTopics.filter((slug) => visibleTopics.some((t) => t.slug === slug)).length,
-    [completedTopics, visibleTopics]
+  const inProgressTopics = useMemo(
+    () =>
+      Object.entries(topicProgress)
+        .filter(([, progress]) => progress.started && !progress.completedAt)
+        .map(([slug, progress]) => ({ topic: topicLookup.get(slug), progress }))
+        .filter((entry): entry is { topic: (typeof topics)[number]; progress: (typeof topicProgress)[string] } => Boolean(entry.topic))
+        .sort((left, right) => (right.progress.lastAccessedAt ?? "").localeCompare(left.progress.lastAccessedAt ?? "")),
+    [topicLookup, topicProgress]
   );
 
-  const totalTopics = visibleTopics.length;
-  const completionRate = totalTopics > 0 ? Math.round((completedCount / totalTopics) * 100) : 0;
+  const recentlyCompleted = useMemo(
+    () =>
+      Object.entries(topicProgress)
+        .filter(([, progress]) => Boolean(progress.completedAt))
+        .map(([slug, progress]) => ({ topic: topicLookup.get(slug), progress }))
+        .filter((entry): entry is { topic: (typeof topics)[number]; progress: (typeof topicProgress)[string] } => Boolean(entry.topic))
+        .sort((left, right) => (right.progress.completedAt ?? "").localeCompare(left.progress.completedAt ?? ""))
+        .slice(0, 6),
+    [topicLookup, topicProgress]
+  );
 
-  const currentLevel = levels.find((l) => l.id === selectedLevel) || levels[0];
-  const memberSince = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30);
+  const todayKey = toDateKey(new Date());
+  const todayTime = activityLog[todayKey]?.timeSpent ?? 0;
+  const weekTime = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  // Create a map from problemId to difficulty
-  const problemDifficultyMap = useMemo(() => {
-    const map = new Map<string, string>();
-    visibleTopics.forEach((topic) => {
-      topic.problems.forEach((problem) => {
-        map.set(problem.id, problem.difficulty);
-      });
-    });
-    return map;
-  }, [visibleTopics]);
+    return Object.entries(activityLog).reduce((total, [dateKey, activity]) => {
+      const date = new Date(`${dateKey}T00:00:00`);
+      const diffDays = Math.floor((today.getTime() - date.getTime()) / 86400000);
+      return diffDays >= 0 && diffDays < 7 ? total + activity.timeSpent : total;
+    }, 0);
+  }, [activityLog]);
 
-  const solvedProblems = problemHistory.filter((p) => p.isCorrect);
-  const totalAttempts = problemHistory.length;
-  const acceptanceRate = totalAttempts > 0 ? Math.round((solvedProblems.length / totalAttempts) * 100) : 0;
+  const solvedProblems = problemHistory.filter((attempt) => attempt.isCorrect).length;
+  const accuracy = problemHistory.length > 0 ? Math.round((solvedProblems / problemHistory.length) * 100) : 0;
 
-  const allProblems = useMemo(() => visibleTopics.flatMap((t) => t.problems), [visibleTopics]);
+  const levelCompletion = useMemo(
+    () =>
+      levels.map((level) => {
+        const levelTopics = topics.filter((topic) => topic.level === level.id);
+        const completed = levelTopics.filter((topic) => Boolean(topicProgress[topic.slug]?.completedAt)).length;
+        const percentage = levelTopics.length > 0 ? Math.round((completed / levelTopics.length) * 100) : 0;
 
-  const difficultyStats = [
-    {
-      difficulty: "Easy",
-      count: solvedProblems.filter((p) => problemDifficultyMap.get(p.problemId) === "Easy").length,
-      total: allProblems.filter((p) => p.difficulty === "Easy").length,
-      color: "bg-emerald-500",
-      textColor: "text-emerald-400",
-    },
-    {
-      difficulty: "Medium",
-      count: solvedProblems.filter((p) => problemDifficultyMap.get(p.problemId) === "Medium").length,
-      total: allProblems.filter((p) => p.difficulty === "Medium").length,
-      color: "bg-amber-500",
-      textColor: "text-amber-400",
-    },
-    {
-      difficulty: "Hard",
-      count: solvedProblems.filter((p) => problemDifficultyMap.get(p.problemId) === "Hard").length,
-      total: allProblems.filter((p) => p.difficulty === "Hard").length,
-      color: "bg-rose-500",
-      textColor: "text-rose-400",
-    },
-  ];
+        return {
+          ...level,
+          total: levelTopics.length,
+          completed,
+          percentage,
+        };
+      }),
+    [topicProgress]
+  );
 
-  const achievements = [
-    {
-      title: "First Topic",
-      description: "Complete your first DSA topic",
-      earned: completedTopics.length >= 1,
-      gradient: "from-purple-500/25 to-fuchsia-500/20",
-    },
-    {
-      title: "Problem Solver",
-      description: "Solve 10 practice problems",
-      earned: solvedProblems.length >= 10,
-      gradient: "from-blue-500/25 to-cyan-500/20",
-    },
-    {
-      title: "7-Day Streak",
-      description: "Practice daily for a week",
-      earned: streakDays >= 7,
-      gradient: "from-orange-500/25 to-rose-500/20",
-    },
-  ];
+  const highlightMessage = useMemo(() => {
+    if (dailyStreak.currentStreak >= 7) {
+      return `🔥 ${dailyStreak.currentStreak}-day streak — consistency is becoming your superpower.`;
+    }
+
+    if (learningStats.topicsCompleted >= 5) {
+      return "You have enough completed topics to start seeing deep DSA pattern overlap.";
+    }
+
+    return getMilestoneMessage(
+      inProgressTopics[0] ? calculateTopicCompletion(inProgressTopics[0].progress) : 0,
+      inProgressTopics[0] ? isTopicMastered(inProgressTopics[0].progress) : false
+    );
+  }, [dailyStreak.currentStreak, inProgressTopics, learningStats.topicsCompleted]);
+
+  const recommendationContext = useMemo(
+    () => ({ selectedLevel, completedTopics, topicProgress, problemHistory, conceptMastery }),
+    [completedTopics, conceptMastery, problemHistory, selectedLevel, topicProgress]
+  );
+  const suggestedTopics = useMemo(() => getRecommendedTopics(recommendationContext, 5), [recommendationContext]);
+  const weakAreas = useMemo(() => getWeakAreasToRevisit(recommendationContext, 3), [recommendationContext]);
+  const estimatedLevelCompletion = useMemo(
+    () => estimateCurrentLevelCompletionMinutes(recommendationContext),
+    [recommendationContext]
+  );
+  const learningPathPreview = useMemo(
+    () => buildLearningPathModel(recommendationContext, { levelFilter: selectedLevel ?? "all" }),
+    [recommendationContext, selectedLevel]
+  );
+  const notifications = useMemo(() => buildLearningNotifications(recommendationContext), [recommendationContext]);
 
   if (!session) {
     return (
@@ -177,9 +175,9 @@ export default function ProfilePage() {
           <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full border border-purple-400/20 bg-purple-500/10 text-4xl text-purple-200">
             👤
           </div>
-          <h1 className="text-4xl font-semibold text-white">Your DSA journey deserves a real dashboard</h1>
+          <h1 className="text-4xl font-semibold text-white">Sign in to unlock your progress cockpit</h1>
           <p className="mt-4 text-lg leading-8 text-gray-300">
-            Sign in with Google to unlock profile analytics, achievements, and progress tracking.
+            Save streaks, learning time, and topic mastery across sessions with Google sign-in.
           </p>
           <motion.button
             type="button"
@@ -188,12 +186,6 @@ export default function ProfilePage() {
             onClick={() => signIn("google")}
             className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-purple-500 to-fuchsia-500 px-8 py-4 text-lg font-semibold text-white shadow-xl"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
             Sign in with Google
           </motion.button>
         </motion.div>
@@ -203,7 +195,6 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-      {/* User Card */}
       <motion.section
         custom={0}
         initial="hidden"
@@ -212,207 +203,268 @@ export default function ProfilePage() {
         className={`relative overflow-hidden p-8 md:p-10 ${glassCardClass}`}
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_32%)]" />
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-            {session.user?.image ? (
-              <motion.img
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.15, duration: 0.45 }}
-                src={session.user.image}
-                alt={session.user.name || "Profile avatar"}
-                className="h-28 w-28 rounded-[2rem] border border-white/15 object-cover shadow-2xl"
-              />
-            ) : (
-              <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] border border-white/15 bg-white/5 text-4xl font-semibold text-purple-200">
-                {session.user?.name?.charAt(0) ?? "U"}
-              </div>
-            )}
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-purple-400/20 bg-purple-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.28em] text-purple-200/80">
-                <span>{currentLevel.icon}</span>
-                {currentLevel.title} learner
-              </div>
-              <h1 className="mt-4 text-3xl font-semibold text-white sm:text-4xl">{session.user?.name ?? "DSA Explorer"}</h1>
-              <p className="mt-2 text-base text-gray-300">{session.user?.email ?? "No email connected"}</p>
-              <div className="mt-4 flex flex-wrap gap-3 text-sm text-gray-300">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2">
-                  <FiCalendar className="h-4 w-4 text-purple-200" />
-                  Member since {formatDate(memberSince)}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2">
-                  <FiTrendingUp className="h-4 w-4 text-emerald-300" />
-                  {acceptanceRate}% practice accuracy
-                </span>
-              </div>
+        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] xl:items-center">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-purple-400/20 bg-purple-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.28em] text-purple-200/80">
+              <FiTrendingUp className="h-3.5 w-3.5" />
+              Learning cockpit
+            </div>
+            <h1 className="mt-4 text-4xl font-semibold text-white">Welcome back, {session.user?.name ?? "DSA Explorer"}</h1>
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">{highlightMessage}</p>
+            <div className="mt-6 flex flex-wrap gap-3 text-sm text-gray-300">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2">
+                <FiCalendar className="h-4 w-4 text-purple-200" />
+                Member since {formatDate(memberSince.toISOString())}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-4 py-2">
+                <FiBarChart2 className="h-4 w-4 text-emerald-300" />
+                {accuracy}% practice accuracy
+              </span>
             </div>
           </div>
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="inline-flex items-center justify-center gap-2 self-start rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white transition-colors hover:border-purple-400/30"
-          >
-            <FiEdit3 className="h-4 w-4" />
-            Edit profile
-          </motion.button>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[
+              {
+                icon: FiTarget,
+                label: "Topics completed",
+                value: learningStats.topicsCompleted,
+                note: `${learningStats.topicsStarted} started`,
+              },
+              {
+                icon: HiMiniFire,
+                label: "Current streak",
+                value: `${dailyStreak.currentStreak} days`,
+                note: `Best ${dailyStreak.longestStreak} days`,
+              },
+              {
+                icon: FiClock,
+                label: "Time this week",
+                value: formatLearningTime(weekTime),
+                note: `${formatLearningTime(todayTime)} today`,
+              },
+              {
+                icon: FiBarChart2,
+                label: "Quizzes taken",
+                value: learningStats.quizzesTaken,
+                note: `${solvedProblems} solved prompts`,
+              },
+            ].map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div key={stat.label} whileHover={{ y: -3 }} className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-purple-200">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-400">{stat.label}</p>
+                      <p className="mt-1 text-2xl font-semibold text-white">{stat.value}</p>
+                      <p className="text-xs text-slate-500">{stat.note}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
       </motion.section>
 
-      {/* Stats Dashboard */}
-      <motion.section
-        custom={1}
-        initial="hidden"
-        animate="visible"
-        variants={sectionVariants}
-        className="mt-8"
-      >
-        <div className="mb-5">
-          <p className="text-sm uppercase tracking-[0.3em] text-purple-200/60">Stats dashboard</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">Your progress overview</h2>
+      <motion.section custom={1} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <div className={`p-6 ${glassCardClass}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Topics in progress</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Keep the momentum going</h2>
+            </div>
+            <span className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
+              {inProgressTopics.length} active
+            </span>
+          </div>
+
+          <div className="mt-6 grid gap-4">
+            {inProgressTopics.length > 0 ? (
+              inProgressTopics.map(({ topic, progress }) => (
+                <TopicProgressCard
+                  key={topic.slug}
+                  topic={topic}
+                  progress={progress}
+                  completionPercentage={calculateTopicCompletion(progress)}
+                  mastered={isTopicMastered(progress)}
+                />
+              ))
+            ) : (
+              <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-black/20 p-10 text-center text-slate-400">
+                Start a topic and your active learning queue will show up here.
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-4">
-          <motion.div whileHover={{ y: -4 }} className={`p-6 ${glassCardClass}`}>
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-200">
-              <FiTarget className="h-4 w-4" />
-              Topics completed
+        <div className="space-y-6">
+          <div className={`p-6 ${glassCardClass}`}>
+            <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Recently completed</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Your latest wins</h2>
+            <div className="mt-6 space-y-3">
+              {recentlyCompleted.length > 0 ? (
+                recentlyCompleted.map(({ topic, progress }) => (
+                  <div key={topic.slug} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-semibold text-white">
+                          {topic.icon} {topic.title}
+                        </p>
+                        <p className="text-sm text-slate-400">Completed on {formatDate(progress.completedAt)}</p>
+                      </div>
+                      <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">
+                        Done
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-sm text-slate-400">
+                  Finish a topic to build your completion timeline.
+                </p>
+              )}
             </div>
-            <div className="mt-4 flex flex-col items-center gap-4">
-              <ProgressRing value={completionRate} />
-              <p className="text-lg font-semibold text-white">{completedCount} / {totalTopics} topics</p>
-            </div>
-          </motion.div>
+          </div>
 
-          <motion.div whileHover={{ y: -4 }} className={`p-6 ${glassCardClass}`}>
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-200">
-              <FiBarChart2 className="h-4 w-4" />
-              Problems solved
-            </div>
-            <div className="mt-5 space-y-4">
-              {difficultyStats.map((entry) => (
-                <div key={entry.difficulty}>
-                  <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className={entry.textColor}>{entry.difficulty}</span>
-                    <span className="text-gray-400">{entry.count}/{entry.total}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: entry.total > 0 ? `${(entry.count / entry.total) * 100}%` : "0%" }}
-                      transition={{ duration: 1, ease: "easeOut" }}
-                      className={`h-full ${entry.color}`}
-                    />
-                  </div>
+          <div className={`p-6 ${glassCardClass}`}>
+            <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Learning time</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Every minute compounds</h2>
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              {[
+                { label: "Today", value: formatLearningTime(todayTime) },
+                { label: "This week", value: formatLearningTime(weekTime) },
+                { label: "Total", value: formatLearningTime(learningStats.totalTimeSpent) },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <p className="text-sm text-slate-400">{item.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">{item.value}</p>
                 </div>
               ))}
             </div>
-          </motion.div>
-
-          <motion.div whileHover={{ y: -4 }} className={`p-6 ${glassCardClass}`}>
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-200">
-              <HiMiniFire className="h-4 w-4" />
-              Current streak
-            </div>
-            <div className="mt-6 flex flex-col items-center">
-              <span className="text-6xl font-bold text-orange-400">{streakDays}</span>
-              <span className="mt-2 text-sm text-gray-400">days in a row</span>
-            </div>
-          </motion.div>
-
-          <motion.div whileHover={{ y: -4 }} className={`p-6 ${glassCardClass}`}>
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-200">
-              <FiClock className="h-4 w-4" />
-              Total attempts
-            </div>
-            <div className="mt-6 flex flex-col items-center">
-              <span className="text-5xl font-bold text-white">{totalAttempts}</span>
-              <span className="mt-2 text-sm text-gray-400">{solvedProblems.length} solved</span>
-            </div>
-          </motion.div>
+          </div>
         </div>
       </motion.section>
 
-      {/* Achievements */}
-      <motion.section
-        custom={2}
-        initial="hidden"
-        animate="visible"
-        variants={sectionVariants}
-        className="mt-8"
-      >
-        <div className={`p-6 ${glassCardClass}`}>
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-purple-200">
-              <FiAward className="h-5 w-5" />
-            </div>
+      <motion.section custom={2} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 space-y-6">
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <NextTopicCard recommendations={suggestedTopics} />
+
+          <div className={`space-y-6 p-6 ${glassCardClass}`}>
             <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-purple-200/60">Achievements</p>
-              <h2 className="mt-1 text-2xl font-semibold text-white">Badge cabinet</h2>
+              <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Suggested next steps</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Personalized guidance from your current data</h2>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-sm text-slate-400">Current level</p>
+                <p className="mt-2 text-xl font-semibold text-white capitalize">{selectedLevel ?? "beginner"}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-sm text-slate-400">Time to finish level</p>
+                <p className="mt-2 text-xl font-semibold text-white">{formatDuration(estimatedLevelCompletion)}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-sm text-slate-400">Top suggestion</p>
+                <p className="mt-2 text-xl font-semibold text-white">{suggestedTopics[0]?.topic.title ?? "Arrays"}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Encouraging notifications</p>
+              <div className="mt-3 space-y-3">
+                {notifications.map((notification) => (
+                  <div key={notification.id} className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-50">
+                    {notification.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Weak areas to revisit</p>
+                <Link href="/learning-path" className="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200">
+                  View roadmap →
+                </Link>
+              </div>
+              <div className="mt-3 space-y-3">
+                {weakAreas.length > 0 ? (
+                  weakAreas.map((area) => (
+                    <div key={area.topic.slug} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-lg font-semibold text-white">{area.topic.title}</p>
+                        <span className="rounded-full bg-amber-400/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">
+                          {area.quizScore}% quiz score
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-300">{area.primaryReason}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm text-slate-400">
+                    No weak areas detected right now — keep pushing your strongest track forward.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {achievements.map((achievement, index) => (
-              <motion.div
-                key={achievement.title}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.18 + index * 0.08, duration: 0.45 }}
-                whileHover={{ y: -3 }}
-                className={`rounded-2xl border p-4 ${
-                  achievement.earned
-                    ? `border-white/10 bg-gradient-to-r ${achievement.gradient}`
-                    : "border-white/10 bg-black/20"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-white">{achievement.title}</p>
-                    <p className="mt-1 text-sm text-gray-300">{achievement.description}</p>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      achievement.earned
-                        ? "bg-emerald-400/15 text-emerald-200"
-                        : "bg-white/5 text-gray-400"
-                    }`}
-                  >
-                    {achievement.earned ? "Earned" : "Locked"}
+        <LearningPath
+          nodes={learningPathPreview.nodes}
+          edges={learningPathPreview.edges}
+          progressPercentage={learningPathPreview.progressPercentage}
+          preview
+          levelFilter={selectedLevel ?? "all"}
+        />
+
+        <StreakCalendar activityLog={activityLog} topicTitlesBySlug={topicTitlesBySlug} />
+      </motion.section>
+
+      <motion.section custom={3} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className={`p-6 ${glassCardClass}`}>
+          <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Completion by level</p>
+          <h2 className="mt-2 text-2xl font-semibold text-white">See where your depth is growing</h2>
+          <div className="mt-6 space-y-5">
+            {levelCompletion.map((level) => (
+              <div key={level.id}>
+                <div className="mb-2 flex items-center justify-between text-sm text-slate-300">
+                  <span className="flex items-center gap-2">
+                    <span>{level.icon}</span>
+                    {level.title}
+                  </span>
+                  <span>
+                    {level.completed}/{level.total} • {level.percentage}%
                   </span>
                 </div>
-              </motion.div>
+                <div className="h-3 overflow-hidden rounded-full bg-white/10">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${level.percentage}%` }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className={`h-full rounded-full bg-gradient-to-r ${level.color}`}
+                  />
+                </div>
+              </div>
             ))}
           </div>
         </div>
-      </motion.section>
 
-      {/* Settings */}
-      <motion.section
-        custom={3}
-        initial="hidden"
-        animate="visible"
-        variants={sectionVariants}
-        className={`mt-8 p-6 ${glassCardClass}`}
-      >
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-purple-200">
-            <FiSettings className="h-5 w-5" />
-          </div>
-          <h2 className="text-2xl font-semibold text-white">Settings</h2>
-        </div>
-
-        <div className="mt-6 flex gap-4">
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={resetProgress}
-            className="rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-200 transition-colors hover:border-red-400/40"
-          >
-            Reset progress
-          </motion.button>
-        </div>
+        <motion.button
+          type="button"
+          whileHover={{ y: -2, scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
+          onClick={resetProgress}
+          className="inline-flex h-fit items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-5 py-4 text-sm font-medium text-red-200 transition-colors hover:border-red-400/40"
+        >
+          <FiRefreshCcw className="h-4 w-4" />
+          Reset progress
+        </motion.button>
       </motion.section>
     </div>
   );

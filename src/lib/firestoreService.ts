@@ -1,15 +1,23 @@
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { arrayUnion, doc, getDoc, serverTimestamp, setDoc, type DocumentData } from "firebase/firestore";
 import type { Level } from "@/data/topics";
-import type { ProblemAttempt } from "@/store/useStore";
+import { defaultEfficiencyStats, type EfficiencyStats, type TopicMastery } from "@/lib/analytics";
+import type {
+  ActivityLog,
+  DailyStreak,
+  LearningStats,
+  PersistedProgressState,
+  PlaygroundSubmission,
+  ProblemAttempt,
+  QuizAttempt,
+  TopicProgressEntry,
+  TopicProgressMap,
+} from "@/store/useStore";
 
-export interface UserProfile {
+export interface UserProfile extends PersistedProgressState {
   email: string;
   name: string;
   image: string;
-  selectedLevel: Level | null;
-  completedTopics: string[];
-  problemHistory: ProblemAttempt[];
   createdAt?: unknown;
   updatedAt?: unknown;
 }
@@ -20,40 +28,251 @@ const VALID_LEVELS: readonly Level[] = ["beginner", "intermediate", "advanced", 
 let hasWarnedAboutFirebaseAvailability = false;
 
 const isLevel = (value: unknown): value is Level => VALID_LEVELS.includes(value as Level);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
+const isString = (value: unknown): value is string => typeof value === "string";
+const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+const uniqueStrings = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? [...new Set(value.filter((entry): entry is string => typeof entry === "string" && entry.length > 0))]
+    : [];
+const sanitizeString = (value: unknown): string => (typeof value === "string" ? value : "");
 
 const isProblemAttempt = (value: unknown): value is ProblemAttempt => {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
 
-  const attempt = value as Record<string, unknown>;
-
   return (
-    typeof attempt.problemId === "string" &&
-    typeof attempt.topicSlug === "string" &&
-    typeof attempt.userTimeComplexity === "string" &&
-    typeof attempt.userSpaceComplexity === "string" &&
-    typeof attempt.isCorrect === "boolean" &&
-    typeof attempt.attemptedAt === "string"
+    isString(value.problemId) &&
+    isString(value.topicSlug) &&
+    isString(value.userTimeComplexity) &&
+    isString(value.userSpaceComplexity) &&
+    typeof value.isCorrect === "boolean" &&
+    isString(value.attemptedAt) &&
+    (value.quizScore === undefined || isNumber(value.quizScore)) &&
+    (value.quizTimeSeconds === undefined || isNumber(value.quizTimeSeconds)) &&
+    (value.practiceScore === undefined || isNumber(value.practiceScore)) &&
+    (value.codeExecutions === undefined || isNumber(value.codeExecutions)) &&
+    (value.visualTimeSpentSeconds === undefined || isNumber(value.visualTimeSpentSeconds))
   );
 };
 
-const sanitizeString = (value: unknown): string => (typeof value === "string" ? value : "");
+const isPlaygroundSubmission = (value: unknown): value is PlaygroundSubmission => {
+  if (!isRecord(value)) {
+    return false;
+  }
 
-const sanitizeUserProfile = (data: DocumentData | undefined): UserProfile => ({
-  email: sanitizeString(data?.email),
-  name: sanitizeString(data?.name),
-  image: sanitizeString(data?.image),
-  selectedLevel: isLevel(data?.selectedLevel) ? data.selectedLevel : null,
-  completedTopics: Array.isArray(data?.completedTopics)
-    ? [...new Set(data.completedTopics.filter((topic): topic is string => typeof topic === "string"))]
-    : [],
-  problemHistory: Array.isArray(data?.problemHistory)
-    ? data.problemHistory.filter(isProblemAttempt)
-    : [],
-  createdAt: data?.createdAt,
-  updatedAt: data?.updatedAt,
-});
+  return (
+    isString(value.topicSlug) &&
+    isString(value.code) &&
+    isString(value.language) &&
+    isString(value.output) &&
+    typeof value.passed === "boolean" &&
+    (value.timestamp === undefined || isString(value.timestamp)) &&
+    (value.executionTime === undefined || isString(value.executionTime)) &&
+    (value.memory === undefined || isNumber(value.memory)) &&
+    (value.status === undefined || isString(value.status)) &&
+    (value.error === undefined || isString(value.error))
+  );
+};
+
+const sanitizeTopicProgressEntry = (value: unknown): TopicProgressEntry => {
+  if (!isRecord(value)) {
+    return {
+      started: false,
+      visualizerViewed: false,
+      videosWatched: [],
+      algorithmRead: false,
+      timeSpent: 0,
+    };
+  }
+
+  return {
+    started: Boolean(value.started),
+    visualizerViewed: Boolean(value.visualizerViewed),
+    videosWatched: uniqueStrings(value.videosWatched),
+    algorithmRead: Boolean(value.algorithmRead),
+    quizScore: isNumber(value.quizScore) ? Math.max(0, Math.min(100, Math.round(value.quizScore))) : undefined,
+    completedAt: isString(value.completedAt) ? value.completedAt : undefined,
+    timeSpent: isNumber(value.timeSpent) ? Math.max(0, Math.round(value.timeSpent)) : 0,
+    lastAccessedAt: isString(value.lastAccessedAt) ? value.lastAccessedAt : undefined,
+  };
+};
+
+const sanitizeTopicProgressMap = (value: unknown): TopicProgressMap => {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce<TopicProgressMap>((accumulator, [slug, entry]) => {
+    accumulator[slug] = sanitizeTopicProgressEntry(entry);
+    return accumulator;
+  }, {});
+};
+
+const sanitizeDailyStreak = (value: unknown): DailyStreak => {
+  if (!isRecord(value)) {
+    return {
+      currentStreak: 0,
+      lastActiveDate: "",
+      longestStreak: 0,
+    };
+  }
+
+  const currentStreak = isNumber(value.currentStreak) ? Math.max(0, Math.round(value.currentStreak)) : 0;
+  const longestStreak = isNumber(value.longestStreak) ? Math.max(currentStreak, Math.round(value.longestStreak)) : currentStreak;
+
+  return {
+    currentStreak,
+    lastActiveDate: isString(value.lastActiveDate) ? value.lastActiveDate : "",
+    longestStreak,
+  };
+};
+
+const sanitizeLearningStats = (value: unknown): LearningStats => {
+  if (!isRecord(value)) {
+    return {
+      totalTimeSpent: 0,
+      topicsStarted: 0,
+      topicsCompleted: 0,
+      quizzesTaken: 0,
+    };
+  }
+
+  return {
+    totalTimeSpent: isNumber(value.totalTimeSpent) ? Math.max(0, Math.round(value.totalTimeSpent)) : 0,
+    topicsStarted: isNumber(value.topicsStarted) ? Math.max(0, Math.round(value.topicsStarted)) : 0,
+    topicsCompleted: isNumber(value.topicsCompleted) ? Math.max(0, Math.round(value.topicsCompleted)) : 0,
+    quizzesTaken: isNumber(value.quizzesTaken) ? Math.max(0, Math.round(value.quizzesTaken)) : 0,
+  };
+};
+
+const sanitizeActivityLog = (value: unknown): ActivityLog => {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce<ActivityLog>((accumulator, [dateKey, entry]) => {
+    if (!isRecord(entry)) {
+      return accumulator;
+    }
+
+    accumulator[dateKey] = {
+      date: isString(entry.date) ? entry.date : dateKey,
+      timeSpent: isNumber(entry.timeSpent) ? Math.max(0, Math.round(entry.timeSpent)) : 0,
+      topicsLearned: uniqueStrings(entry.topicsLearned),
+      activityCount: isNumber(entry.activityCount) ? Math.max(0, Math.round(entry.activityCount)) : 0,
+    };
+    return accumulator;
+  }, {});
+};
+
+const isTopicMastery = (value: unknown): value is TopicMastery => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isNumber(value.visualScore) &&
+    isNumber(value.quizScore) &&
+    isNumber(value.practiceScore) &&
+    isNumber(value.overallMastery)
+  );
+};
+
+const sanitizeConceptMasteryEntries = (value: unknown): Array<[string, TopicMastery]> => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!Array.isArray(entry) || entry.length !== 2 || !isString(entry[0]) || !isTopicMastery(entry[1])) {
+        return null;
+      }
+
+      return [entry[0], entry[1]] as [string, TopicMastery];
+    })
+    .filter((entry): entry is [string, TopicMastery] => Boolean(entry));
+};
+
+const sanitizeEfficiencyStats = (value: unknown): EfficiencyStats => {
+  if (!isRecord(value)) {
+    return defaultEfficiencyStats;
+  }
+
+  return {
+    averageQuizTime: isNumber(value.averageQuizTime) ? Math.max(0, Math.round(value.averageQuizTime)) : 0,
+    averageQuizScore: isNumber(value.averageQuizScore) ? Math.max(0, Math.min(100, Math.round(value.averageQuizScore))) : 0,
+    conceptsImplemented: isNumber(value.conceptsImplemented) ? Math.max(0, Math.round(value.conceptsImplemented)) : 0,
+    totalCodeExecutions: isNumber(value.totalCodeExecutions) ? Math.max(0, Math.round(value.totalCodeExecutions)) : 0,
+  };
+};
+
+const isQuizAttempt = (value: unknown): value is QuizAttempt => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isString(value.topicSlug) &&
+    isNumber(value.score) &&
+    isNumber(value.totalQuestions) &&
+    isNumber(value.timeTaken) &&
+    isString(value.attemptedAt)
+  );
+};
+
+const sanitizeBestScoreEntries = (value: unknown): Array<[string, number]> => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!Array.isArray(entry) || entry.length !== 2 || !isString(entry[0]) || !isNumber(entry[1])) {
+        return null;
+      }
+
+      return [entry[0], Math.max(0, Math.min(100, Math.round(entry[1])))] as [string, number];
+    })
+    .filter((entry): entry is [string, number] => Boolean(entry));
+};
+
+const sanitizeUserProfile = (data: DocumentData | undefined): UserProfile => {
+  const playgroundHistory = Array.isArray(data?.playgroundHistory)
+    ? data.playgroundHistory.filter(isPlaygroundSubmission)
+    : Array.isArray(data?.playgroundSubmissions)
+      ? data.playgroundSubmissions.filter(isPlaygroundSubmission)
+      : [];
+
+  return {
+    email: sanitizeString(data?.email),
+    name: sanitizeString(data?.name),
+    image: sanitizeString(data?.image),
+    selectedLevel: isLevel(data?.selectedLevel) ? data.selectedLevel : null,
+    completedTopics: uniqueStrings(data?.completedTopics),
+    problemHistory: Array.isArray(data?.problemHistory) ? data.problemHistory.filter(isProblemAttempt) : [],
+    topicProgress: sanitizeTopicProgressMap(data?.topicProgress),
+    playgroundSubmissions: playgroundHistory,
+    playgroundHistory,
+    playgroundSuccessCount: isNumber(data?.playgroundSuccessCount)
+      ? Math.max(0, Math.round(data.playgroundSuccessCount))
+      : playgroundHistory.filter((submission) => submission.passed).length,
+    playgroundFailureCount: isNumber(data?.playgroundFailureCount)
+      ? Math.max(0, Math.round(data.playgroundFailureCount))
+      : playgroundHistory.filter((submission) => !submission.passed).length,
+    quizHistory: Array.isArray(data?.quizHistory) ? data.quizHistory.filter(isQuizAttempt) : [],
+    bestScoreEntries: sanitizeBestScoreEntries(data?.bestScoreEntries),
+    dailyStreak: sanitizeDailyStreak(data?.dailyStreak),
+    learningStats: sanitizeLearningStats(data?.learningStats),
+    activityLog: sanitizeActivityLog(data?.activityLog),
+    conceptMasteryEntries: sanitizeConceptMasteryEntries(data?.conceptMasteryEntries),
+    efficiencyStats: sanitizeEfficiencyStats(data?.efficiencyStats),
+    createdAt: data?.createdAt,
+    updatedAt: data?.updatedAt,
+  };
+};
 
 const sanitizeUserProfilePatch = (data: UserProfilePatch): UserProfilePatch => {
   const patch: UserProfilePatch = {};
@@ -62,16 +281,44 @@ const sanitizeUserProfilePatch = (data: UserProfilePatch): UserProfilePatch => {
   if ("name" in data) patch.name = sanitizeString(data.name);
   if ("image" in data) patch.image = sanitizeString(data.image);
   if ("selectedLevel" in data) patch.selectedLevel = isLevel(data.selectedLevel) ? data.selectedLevel : null;
-  if ("completedTopics" in data) {
-    patch.completedTopics = Array.isArray(data.completedTopics)
-      ? [...new Set(data.completedTopics.filter((topic): topic is string => typeof topic === "string"))]
-      : [];
-  }
+  if ("completedTopics" in data) patch.completedTopics = uniqueStrings(data.completedTopics);
   if ("problemHistory" in data) {
-    patch.problemHistory = Array.isArray(data.problemHistory)
-      ? data.problemHistory.filter(isProblemAttempt)
-      : [];
+    patch.problemHistory = Array.isArray(data.problemHistory) ? data.problemHistory.filter(isProblemAttempt) : [];
   }
+  if ("topicProgress" in data) patch.topicProgress = sanitizeTopicProgressMap(data.topicProgress);
+  if ("playgroundSubmissions" in data || "playgroundHistory" in data) {
+    const playgroundHistory = Array.isArray(data.playgroundHistory)
+      ? data.playgroundHistory.filter(isPlaygroundSubmission)
+      : Array.isArray(data.playgroundSubmissions)
+        ? data.playgroundSubmissions.filter(isPlaygroundSubmission)
+        : [];
+
+    patch.playgroundSubmissions = playgroundHistory;
+    patch.playgroundHistory = playgroundHistory;
+  }
+  if ("playgroundSuccessCount" in data) {
+    patch.playgroundSuccessCount = isNumber(data.playgroundSuccessCount)
+      ? Math.max(0, Math.round(data.playgroundSuccessCount))
+      : 0;
+  }
+  if ("playgroundFailureCount" in data) {
+    patch.playgroundFailureCount = isNumber(data.playgroundFailureCount)
+      ? Math.max(0, Math.round(data.playgroundFailureCount))
+      : 0;
+  }
+  if ("quizHistory" in data) {
+    patch.quizHistory = Array.isArray(data.quizHistory) ? data.quizHistory.filter(isQuizAttempt) : [];
+  }
+  if ("bestScoreEntries" in data) {
+    patch.bestScoreEntries = sanitizeBestScoreEntries(data.bestScoreEntries);
+  }
+  if ("dailyStreak" in data) patch.dailyStreak = sanitizeDailyStreak(data.dailyStreak);
+  if ("learningStats" in data) patch.learningStats = sanitizeLearningStats(data.learningStats);
+  if ("activityLog" in data) patch.activityLog = sanitizeActivityLog(data.activityLog);
+  if ("conceptMasteryEntries" in data) {
+    patch.conceptMasteryEntries = sanitizeConceptMasteryEntries(data.conceptMasteryEntries);
+  }
+  if ("efficiencyStats" in data) patch.efficiencyStats = sanitizeEfficiencyStats(data.efficiencyStats);
 
   return patch;
 };
@@ -163,7 +410,7 @@ export async function markTopicCompleteInDB(userId: string, completedTopics: str
     await setDoc(
       getUserDocument(userId),
       {
-        completedTopics: [...new Set(completedTopics.filter((topic): topic is string => typeof topic === "string"))],
+        completedTopics: uniqueStrings(completedTopics),
         updatedAt: serverTimestamp(),
       },
       { merge: true }

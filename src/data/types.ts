@@ -27,6 +27,13 @@ export interface Problem {
   expectedSpaceComplexity: string;
 }
 
+export interface YouTubeVideo {
+  id: string;
+  title: string;
+  channel: string;
+  duration?: string;
+}
+
 export interface Topic {
   slug: string;
   title: string;
@@ -37,6 +44,22 @@ export interface Topic {
   detailedExplanation: string;
   realWorldAnalogy: string;
   visualizerType: string;
+  youtubeVideos: YouTubeVideo[];
   algorithms: Algorithm[];
   problems: Problem[];
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  codeSnippet?: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+  difficulty: "easy" | "medium" | "hard";
+}
+
+export interface Quiz {
+  topicSlug: string;
+  questions: QuizQuestion[];
 }

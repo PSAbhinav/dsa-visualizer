@@ -1,4 +1,4 @@
-export type { Level, ProgrammingLanguage, CodeImplementation, Algorithm, Problem, Topic } from "./types";
+export type { Level, ProgrammingLanguage, CodeImplementation, Algorithm, Problem, Topic, YouTubeVideo } from "./types";
 import type { Level, Algorithm, Problem, Topic } from "./types";
 import * as algoCode from "./algorithmCode";
 
@@ -51,6 +51,20 @@ Key Concepts:
 • Many advanced techniques such as sliding window and DP are built on arrays`,
     realWorldAnalogy: "A row of numbered lockers where you can instantly open locker 17, but reorganizing lockers in the middle takes effort.",
     visualizerType: "array",
+    youtubeVideos: [
+      {
+        id: "5tPLyHCZdU0",
+        title: "Arrays in programming - fundamentals",
+        channel: "mycodeschool",
+        duration: "10:14",
+      },
+      {
+        id: "KLlXCFG5TnA",
+        title: "Two Sum - Leetcode 1 - HashMap - Python",
+        channel: "NeetCode",
+        duration: "8:26",
+      },
+    ],
     algorithms: [
       {
         name: "Kadane's Algorithm",
@@ -136,6 +150,20 @@ Key Concepts:
 • Efficient string work avoids repeated concatenation and unnecessary copies`,
     realWorldAnalogy: "A sentence on magnetic letter tiles where you can inspect positions, compare patterns, and rearrange characters to reveal hidden structure.",
     visualizerType: "string",
+    youtubeVideos: [
+      {
+        id: "jJXJ16kPFWg",
+        title: "Valid Palindrome - Leetcode 125 - Python",
+        channel: "NeetCode",
+        duration: "14:58",
+      },
+      {
+        id: "9UtInBqnCgA",
+        title: "Valid Anagram - Leetcode 242 - Python",
+        channel: "NeetCode",
+        duration: "12:01",
+      },
+    ],
     algorithms: [
       {
         name: "String Reversal",
@@ -226,6 +254,20 @@ Key Concepts:
 • Variants include singly, doubly, and circular linked lists`,
     realWorldAnalogy: "A treasure hunt where each clue points to the next location, but you cannot jump directly to clue 20 without following the chain.",
     visualizerType: "linkedlist",
+    youtubeVideos: [
+      {
+        id: "NobHlGUjV3g",
+        title: "Introduction to linked list",
+        channel: "mycodeschool",
+        duration: "17:13",
+      },
+      {
+        id: "G0_I-ZF0S38",
+        title: "Reverse Linked List - Iterative AND Recursive - Leetcode 206 - Python",
+        channel: "NeetCode",
+        duration: "11:07",
+      },
+    ],
     algorithms: [
       {
         name: "Reverse Linked List",
@@ -318,6 +360,20 @@ Key Concepts:
 • Stack-based scans often reduce quadratic brute force to linear time`,
     realWorldAnalogy: "A stack of trays in a cafeteria: the last tray placed on top is the first one removed.",
     visualizerType: "stack",
+    youtubeVideos: [
+      {
+        id: "sFVxsglODoo",
+        title: "Data structures: Array implementation of stacks",
+        channel: "mycodeschool",
+        duration: "13:09",
+      },
+      {
+        id: "WTzjTskDFMg",
+        title: "Valid Parentheses - Stack - Leetcode 20 - Python",
+        channel: "NeetCode",
+        duration: "10:43",
+      },
+    ],
     algorithms: [
       {
         name: "Basic Stack Operations",
@@ -405,6 +461,20 @@ Key Concepts:
 • Deques extend queues with operations on both ends`,
     realWorldAnalogy: "A line at a ticket counter where the first person to arrive is served first.",
     visualizerType: "queue",
+    youtubeVideos: [
+      {
+        id: "XuCbpw6Bj1U",
+        title: "Data structures: Introduction to Queues",
+        channel: "mycodeschool",
+        duration: "9:19",
+      },
+      {
+        id: "KxzhEQ-zpDc",
+        title: "Queue Introduction",
+        channel: "WilliamFiset",
+        duration: "6:26",
+      },
+    ],
     algorithms: [
       {
         name: "Basic Queue Operations",
@@ -494,6 +564,20 @@ Key Concepts:
 • Basic sorts are ideal for learning swap, insertion, and partition ideas`,
     realWorldAnalogy: "Organizing books on a shelf: some methods compare neighbors repeatedly, while others split the shelf into smaller groups and merge the results.",
     visualizerType: "sorting",
+    youtubeVideos: [
+      {
+        id: "mB5HXBb_HY8",
+        title: "2.7.2.  Merge Sort Algorithm",
+        channel: "Abdul Bari",
+        duration: "20:23",
+      },
+      {
+        id: "7h1s2SojIRw",
+        title: "2.8.1  QuickSort Algorithm",
+        channel: "Abdul Bari",
+        duration: "13:43",
+      },
+    ],
     algorithms: [
       {
         name: "Bubble Sort",
@@ -603,6 +687,20 @@ Key Concepts:
 • Search design often starts by identifying monotonic behavior`,
     realWorldAnalogy: "Finding a word in an unsorted notebook takes page-by-page scanning, but a dictionary lets you jump to the middle and narrow down quickly.",
     visualizerType: "searching",
+    youtubeVideos: [
+      {
+        id: "C2apEw9pgtw",
+        title: "2.6.1 Binary Search Iterative Method",
+        channel: "Abdul Bari",
+        duration: "19:36",
+      },
+      {
+        id: "s4DPM8ct1pI",
+        title: "Binary Search - Leetcode 704 - Python",
+        channel: "NeetCode",
+        duration: "9:40",
+      },
+    ],
     algorithms: [
       {
         name: "Linear Search",
@@ -691,6 +789,20 @@ Key Concepts:
 • Fast exponentiation turns repeated multiplication into logarithmic work`,
     realWorldAnalogy: "Like simplifying fractions, checking divisibility, and using clock arithmetic to avoid counting forever.",
     visualizerType: "math",
+    youtubeVideos: [
+      {
+        id: "eKp56OLhoQs",
+        title: "Finding Prime numbers - Sieve of Eratosthenes",
+        channel: "mycodeschool",
+        duration: "9:54",
+      },
+      {
+        id: "g9YQyYi4IQQ",
+        title: "Pow(x, n) - X to the power of N - Leetcode 50 - Python",
+        channel: "NeetCode",
+        duration: "12:37",
+      },
+    ],
     algorithms: [
       {
         name: "Euclidean GCD",
@@ -776,6 +888,20 @@ Key Concepts:
 • Many graph problems on grids are disguised matrix problems`,
     realWorldAnalogy: "A spreadsheet where every cell has a row and column address and nearby cells influence one another.",
     visualizerType: "matrix",
+    youtubeVideos: [
+      {
+        id: "BJnMZNwUk1M",
+        title: "Spiral Matrix - Microsoft Interview Question - Leetcode 54",
+        channel: "NeetCode",
+        duration: "16:46",
+      },
+      {
+        id: "T41rL0L3Pnw",
+        title: "Set Matrix Zeroes - In-place - Leetcode 73",
+        channel: "NeetCode",
+        duration: "18:05",
+      },
+    ],
     algorithms: [
       {
         name: "Row-Major Traversal",
@@ -862,6 +988,20 @@ Key Concepts:
 • Many interview problems rely on divide-and-combine reasoning on subtrees`,
     realWorldAnalogy: "A family tree where each person branches downward into smaller subfamilies that can be processed independently.",
     visualizerType: "binarytree",
+    youtubeVideos: [
+      {
+        id: "H5JubkIy_p8",
+        title: "Data structures: Binary Tree",
+        channel: "mycodeschool",
+        duration: "16:17",
+      },
+      {
+        id: "6ZnyEApgFYg",
+        title: "Binary Tree Level Order Traversal - BFS - Leetcode 102",
+        channel: "NeetCode",
+        duration: "9:36",
+      },
+    ],
     algorithms: [
       {
         name: "Inorder Traversal",
@@ -945,6 +1085,20 @@ Key Concepts:
 • Balance matters because skewed BSTs behave like linked lists`,
     realWorldAnalogy: "A decision tree in a guessing game where each choice sends you left or right depending on whether the target is smaller or larger.",
     visualizerType: "bst",
+    youtubeVideos: [
+      {
+        id: "pYT9F8_LFTM",
+        title: "Data structures: Binary Search Tree",
+        channel: "mycodeschool",
+        duration: "19:28",
+      },
+      {
+        id: "s6ATEkipzow",
+        title: "Validate Binary Search Tree - Depth First Search - Leetcode 98",
+        channel: "NeetCode",
+        duration: "9:56",
+      },
+    ],
     algorithms: [
       {
         name: "Search in BST",
@@ -1029,6 +1183,20 @@ Key Concepts:
 • Frequency counting and membership tests are classic hash table applications`,
     realWorldAnalogy: "A mailroom where each name is transformed into a mailbox number, so you can usually jump straight to the right slot.",
     visualizerType: "hashtable",
+    youtubeVideos: [
+      {
+        id: "knV86FlSXJ8",
+        title: "Hash tables in 4 minutes",
+        channel: "Michael Sambol",
+        duration: "3:52",
+      },
+      {
+        id: "vzdNOK2oB2E",
+        title: "Group Anagrams - Categorize Strings by Count - Leetcode 49",
+        channel: "NeetCode",
+        duration: "8:12",
+      },
+    ],
     algorithms: [
       {
         name: "Hash Table Insert / Update",
@@ -1110,6 +1278,20 @@ Key Concepts:
 • Heaps are ideal for streaming top-k and scheduling problems`,
     realWorldAnalogy: "A tournament podium where the champion is always at the top, and the structure is quickly repaired after every change.",
     visualizerType: "heap",
+    youtubeVideos: [
+      {
+        id: "wptevk0bshY",
+        title: "Priority Queue Introduction",
+        channel: "WilliamFiset",
+        duration: "13:18",
+      },
+      {
+        id: "XEmy13g1Qxc",
+        title: "Kth Largest Element in an Array - Quick Select - Leetcode 215 - Python",
+        channel: "NeetCode",
+        duration: "18:48",
+      },
+    ],
     algorithms: [
       {
         name: "Heapify",
@@ -1194,6 +1376,20 @@ Key Concepts:
 • Pruning invalid states early saves enormous amounts of work`,
     realWorldAnalogy: "Walking through a maze, marking a path, and stepping back whenever you hit a dead end.",
     visualizerType: "recursion",
+    youtubeVideos: [
+      {
+        id: "REOH22Xwdkk",
+        title: "Subsets - Backtracking - Leetcode 78",
+        channel: "NeetCode",
+        duration: "8:47",
+      },
+      {
+        id: "xouin83ebxE",
+        title: "N Queen Problem Using Backtracking Algorithm",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "18:04",
+      },
+    ],
     algorithms: [
       {
         name: "Recursive Factorial",
@@ -1275,6 +1471,20 @@ Key Concepts:
 • Many O(n^2) brute force scans become O(n) with these patterns`,
     realWorldAnalogy: "Like adjusting the left and right edges of a camera frame until the scene inside the frame satisfies your condition.",
     visualizerType: "twopointers",
+    youtubeVideos: [
+      {
+        id: "jzZsG8n2R9A",
+        title: "3Sum - Leetcode 15 - Python",
+        channel: "NeetCode",
+        duration: "12:54",
+      },
+      {
+        id: "wiGpQwVHdE0",
+        title: "Longest Substring Without Repeating Characters - Leetcode 3 - Python",
+        channel: "NeetCode",
+        duration: "6:46",
+      },
+    ],
     algorithms: [
       {
         name: "Two Sum in Sorted Array",
@@ -1369,6 +1579,20 @@ Key Concepts:
 • Not every optimization problem is greedy-solvable, so proof matters`,
     realWorldAnalogy: "Packing the most valuable items first when you know that each local choice cannot hurt the final best outcome.",
     visualizerType: "greedy",
+    youtubeVideos: [
+      {
+        id: "ARvQcqJ_-NY",
+        title: "3. Greedy Method -  Introduction",
+        channel: "Abdul Bari",
+        duration: "12:02",
+      },
+      {
+        id: "Yan0cv2cLy8",
+        title: "Jump Game - Greedy - Leetcode 55",
+        channel: "NeetCode",
+        duration: "16:28",
+      },
+    ],
     algorithms: [
       {
         name: "Activity Selection",
@@ -1457,6 +1681,20 @@ Key Concepts:
 • Good OOP design makes DSA implementations easier to test and maintain`,
     realWorldAnalogy: "A toolbox where every drawer has a clear interface, specialized tools extend standard handles, and you can swap compatible tools without changing the whole workshop.",
     visualizerType: "oop",
+    youtubeVideos: [
+      {
+        id: "pTB0EiLXUC8",
+        title: "Object-Oriented Programming, Simplified",
+        channel: "Programming with Mosh",
+        duration: "7:34",
+      },
+      {
+        id: "SiBw7os-_zI",
+        title: "Intro to Object Oriented Programming - Crash Course",
+        channel: "freeCodeCamp.org",
+        duration: "30:18",
+      },
+    ],
     algorithms: [
       {
         name: "Encapsulated Stack ADT",
@@ -1545,6 +1783,20 @@ Key Concepts:
 • Representations such as adjacency lists trade memory for traversal convenience`,
     realWorldAnalogy: "A city map where intersections are nodes, roads are edges, and different problems ask for reachability, shortest paths, or connectivity.",
     visualizerType: "graph",
+    youtubeVideos: [
+      {
+        id: "eQA-m22wjTQ",
+        title: "Graph Theory Introduction",
+        channel: "WilliamFiset",
+        duration: "14:08",
+      },
+      {
+        id: "7fujbpJ0LB4",
+        title: "Depth First Search Algorithm | Graph Theory",
+        channel: "WilliamFiset",
+        duration: "10:20",
+      },
+    ],
     algorithms: [
       {
         name: "Depth-First Search",
@@ -1634,6 +1886,20 @@ Key Concepts:
 • Space optimization is often possible when only recent states matter`,
     realWorldAnalogy: "Climbing a staircase while writing down the best answer for each step so you never recompute the same partial journey twice.",
     visualizerType: "dp",
+    youtubeVideos: [
+      {
+        id: "8LusJS5-AGo",
+        title: "0/1 Knapsack Problem Dynamic Programming",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "15:50",
+      },
+      {
+        id: "Y0lT9Fck7qI",
+        title: "Climbing Stairs - Dynamic Programming - Leetcode 70 - Python",
+        channel: "NeetCode",
+        duration: "18:08",
+      },
+    ],
     algorithms: [
       {
         name: "Fibonacci Tabulation",
@@ -1720,6 +1986,20 @@ Key Concepts:
 • Variants support autocomplete, XOR queries, and compressed representations`,
     realWorldAnalogy: "An autocomplete menu that groups words by their common beginnings so matching prefixes instantly narrows the search.",
     visualizerType: "trie",
+    youtubeVideos: [
+      {
+        id: "AXjmTQ8LEoI",
+        title: "Trie Data Structure",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "19:40",
+      },
+      {
+        id: "oobqoCJlHA0",
+        title: "Implement Trie (Prefix Tree) - Leetcode 208",
+        channel: "NeetCode",
+        duration: "18:56",
+      },
+    ],
     algorithms: [
       {
         name: "Insert and Search in Trie",
@@ -1809,6 +2089,20 @@ Key Concepts:
 • Master theorem often analyzes the recurrence created by the split`,
     realWorldAnalogy: "Organizing a huge stack of papers by splitting it into smaller piles, sorting each pile, and then merging them back together.",
     visualizerType: "divideconquer",
+    youtubeVideos: [
+      {
+        id: "2Rr2tW9zvRg",
+        title: "2 Divide And Conquer",
+        channel: "Abdul Bari",
+        duration: "7:04",
+      },
+      {
+        id: "0oJyNmEbS4w",
+        title: "2.9 Strassens Matrix Multiplication",
+        channel: "Abdul Bari",
+        duration: "23:40",
+      },
+    ],
     algorithms: [
       {
         name: "Merge Sort as Divide & Conquer",
@@ -1895,6 +2189,20 @@ Key Concepts:
 • Understanding binary representation often reveals elegant optimizations`,
     realWorldAnalogy: "A panel of light switches where each switch represents one yes-or-no fact and combinations of switches represent whole states.",
     visualizerType: "bitmanip",
+    youtubeVideos: [
+      {
+        id: "qMPX1AOa83k",
+        title: "Single Number - Leetcode 136 - Python",
+        channel: "NeetCode",
+        duration: "7:09",
+      },
+      {
+        id: "5Km3utixwZs",
+        title: "Number of 1 Bits - Leetcode 191 - Python",
+        channel: "NeetCode",
+        duration: "11:59",
+      },
+    ],
     algorithms: [
       {
         name: "XOR for Single Number",
@@ -1975,6 +2283,20 @@ Key Concepts:
 • These structures shine when both updates and range queries are frequent`,
     realWorldAnalogy: "A reporting dashboard that stores summaries for every region and subregion so totals can be updated quickly without recomputing everything.",
     visualizerType: "segmenttree",
+    youtubeVideos: [
+      {
+        id: "ZBHKZF5w4YU",
+        title: "Segment Tree Range Minimum Query",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "27:44",
+      },
+      {
+        id: "CWDQJGaN1gY",
+        title: "Fenwick Tree or Binary Indexed Tree",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "22:43",
+      },
+    ],
     algorithms: [
       {
         name: "Build Segment Tree",
@@ -2064,6 +2386,20 @@ Key Concepts:
 • DSU is essential in connectivity, cycle detection, and MST algorithms`,
     realWorldAnalogy: "Managing friend circles where every person eventually points to one representative of their group, and merging two circles updates only a small amount of structure.",
     visualizerType: "disjointset",
+    youtubeVideos: [
+      {
+        id: "ibjEGG7ylHk",
+        title: "Union Find Introduction",
+        channel: "WilliamFiset",
+        duration: "5:46",
+      },
+      {
+        id: "0jNmHPfA_yE",
+        title: "Union Find - Union and Find Operations",
+        channel: "WilliamFiset",
+        duration: "10:53",
+      },
+    ],
     algorithms: [
       {
         name: "Find with Path Compression",
@@ -2149,6 +2485,20 @@ Key Concepts:
 • Advanced graph problems often combine multiple core patterns`,
     realWorldAnalogy: "Planning airline routes where you may need the cheapest network, a valid dependency order, or path rules that basic traversal alone cannot handle.",
     visualizerType: "advancedgraph",
+    youtubeVideos: [
+      {
+        id: "pSqmAO-m7Lk",
+        title: "Dijkstra's Shortest Path Algorithm | Graph Theory",
+        channel: "WilliamFiset",
+        duration: "24:47",
+      },
+      {
+        id: "eL-KzMXSXXI",
+        title: "Topological Sort Algorithm | Graph Theory",
+        channel: "WilliamFiset",
+        duration: "14:09",
+      },
+    ],
     algorithms: [
       {
         name: "Kruskal's Minimum Spanning Tree",
@@ -2242,6 +2592,20 @@ Key Concepts:
 • These tools are essential in search engines, compilers, and bioinformatics`,
     realWorldAnalogy: "Scanning a giant book with a smart bookmark system that remembers what part of the pattern already matched so you never restart from scratch.",
     visualizerType: "stringalgo",
+    youtubeVideos: [
+      {
+        id: "GTJr8OvyEVQ",
+        title: "Knuth–Morris–Pratt(KMP) Pattern Matching(Substring search)",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "12:50",
+      },
+      {
+        id: "H4VrKHVG5qI",
+        title: "Rabin Karp Substring Search Pattern Matching",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "16:57",
+      },
+    ],
     algorithms: [
       {
         name: "Knuth-Morris-Pratt (KMP)",
@@ -2336,6 +2700,20 @@ Key Concepts:
 • Transition design and memo key choice make or break the solution`,
     realWorldAnalogy: "A strategy game where your score depends not just on where you are, but on which items you have collected and what digits or states remain possible.",
     visualizerType: "advanceddp",
+    youtubeVideos: [
+      {
+        id: "CE2b_-XfVDk",
+        title: "Longest Increasing Subsequence",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "7:09",
+      },
+      {
+        id: "We3YDTzNXEk",
+        title: "Minimum Edit Distance Dynamic Programming",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "9:47",
+      },
+    ],
     algorithms: [
       {
         name: "Bitmask DP for Subset States",
@@ -2423,6 +2801,20 @@ Key Concepts:
 • Matching, circulation, and assignment problems often reduce to flow`,
     realWorldAnalogy: "A water pipeline system where every pipe has a capacity and you want to maximize how much water reaches the destination.",
     visualizerType: "networkflow",
+    youtubeVideos: [
+      {
+        id: "LdOnanfc5TM",
+        title: "Max Flow Ford Fulkerson | Network Flow | Graph Theory",
+        channel: "WilliamFiset",
+        duration: "13:25",
+      },
+      {
+        id: "M6cm8UeeziI",
+        title: "Dinic's Algorithm | Network Flow | Graph Theory",
+        channel: "WilliamFiset",
+        duration: "11:49",
+      },
+    ],
     algorithms: [
       {
         name: "Ford-Fulkerson Method",
@@ -2504,6 +2896,20 @@ Key Concepts:
 • Numerical robustness matters because geometry is sensitive to edge cases`,
     realWorldAnalogy: "Surveying land with compass turns and boundary lines to determine the exact outer fence and relationships between points.",
     visualizerType: "geometry",
+    youtubeVideos: [
+      {
+        id: "Vu84lmMzP2o",
+        title: "Convex Hull Jarvis March(Gift wrapping algorithm)",
+        channel: "Tushar Roy - Coding Made Simple",
+        duration: "18:04",
+      },
+      {
+        id: "B2AJoQSZf4M",
+        title: "Convex Hull Algorithm - Graham Scan and Jarvis March tutorial",
+        channel: "Stable Sort",
+        duration: "7:24",
+      },
+    ],
     algorithms: [
       {
         name: "Orientation Test",
