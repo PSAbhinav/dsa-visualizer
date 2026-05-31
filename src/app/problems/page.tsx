@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   FiArrowRight,
@@ -9,7 +10,9 @@ import {
   FiCheckCircle,
   FiCircle,
   FiExternalLink,
+  FiEye,
   FiFilter,
+  FiLoader,
   FiSearch,
   FiSliders,
 } from "react-icons/fi";
@@ -28,12 +31,14 @@ const difficultyOrder = { Easy: 0, Medium: 1, Hard: 2 } as const;
 const statusOrder = { solved: 0, attempted: 1, unsolved: 2 } as const;
 
 export default function ProblemsPage() {
+  const router = useRouter();
   const { selectedLevel, problemHistory } = useStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("All");
   const [topicFilter, setTopicFilter] = useState("All topics");
   const [sortBy, setSortBy] = useState<SortOption>("difficulty");
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+  const [loadingProblemId, setLoadingProblemId] = useState<string | null>(null);
 
   const filteredTopics = useMemo(
     () => (selectedLevel ? topics.filter((topic) => topic.level === selectedLevel) : topics),
@@ -60,8 +65,8 @@ export default function ProblemsPage() {
           const status: ProblemStatus = attempts.some((attempt) => attempt.isCorrect)
             ? "solved"
             : attempts.length > 0
-            ? "attempted"
-            : "unsolved";
+              ? "attempted"
+              : "unsolved";
 
           return {
             ...problem,
@@ -113,13 +118,21 @@ export default function ProblemsPage() {
       });
   }, [allProblems, difficultyFilter, searchTerm, sortBy, topicFilter]);
 
-  const selectedProblem = visibleProblems.find((problem) => problem.id === selectedProblemId) ?? allProblems.find((problem) => problem.id === selectedProblemId) ?? null;
+  const selectedProblem =
+    visibleProblems.find((problem) => problem.id === selectedProblemId) ??
+    allProblems.find((problem) => problem.id === selectedProblemId) ??
+    null;
 
   const difficultySummary = [
     { label: "Easy", count: allProblems.filter((problem) => problem.difficulty === "Easy").length, tone: "text-emerald-300" },
     { label: "Medium", count: allProblems.filter((problem) => problem.difficulty === "Medium").length, tone: "text-yellow-300" },
     { label: "Hard", count: allProblems.filter((problem) => problem.difficulty === "Hard").length, tone: "text-rose-300" },
   ];
+
+  const handleSolve = (problemId: string, topicSlug: string) => {
+    setLoadingProblemId(problemId);
+    router.push(`/playground?problem=${encodeURIComponent(problemId)}&topic=${encodeURIComponent(topicSlug)}`);
+  };
 
   return (
     <PageTransition>
@@ -139,7 +152,7 @@ export default function ProblemsPage() {
               </div>
               <h1 className="mt-4 text-4xl font-semibold text-white md:text-5xl">Production-ready practice board</h1>
               <p className="mt-4 max-w-3xl text-lg leading-8 text-gray-300">
-                Filter by difficulty, topic, or search intent, then jump into problem details or open the original LeetCode prompt.
+                Filter by difficulty, topic, or search intent, then jump into the playground with a starter solution or review the full problem details.
               </p>
               <div className="mt-5 flex flex-wrap gap-4 text-sm text-gray-400">
                 {difficultySummary.map((entry) => (
@@ -271,17 +284,18 @@ export default function ProblemsPage() {
                     problem.difficulty === "Easy"
                       ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/20"
                       : problem.difficulty === "Medium"
-                      ? "bg-yellow-500/15 text-yellow-100 border-yellow-400/20"
-                      : "bg-rose-500/15 text-rose-100 border-rose-400/20";
+                        ? "bg-yellow-500/15 text-yellow-100 border-yellow-400/20"
+                        : "bg-rose-500/15 text-rose-100 border-rose-400/20";
 
                   const statusConfig =
                     problem.status === "solved"
                       ? { label: "Solved", icon: FiCheckCircle, tone: "text-emerald-300", dot: "bg-emerald-400" }
                       : problem.status === "attempted"
-                      ? { label: "Attempted", icon: FiBarChart2, tone: "text-amber-300", dot: "bg-amber-400" }
-                      : { label: "Unsolved", icon: FiCircle, tone: "text-gray-400", dot: "bg-gray-500" };
+                        ? { label: "Attempted", icon: FiBarChart2, tone: "text-amber-300", dot: "bg-amber-400" }
+                        : { label: "Unsolved", icon: FiCircle, tone: "text-gray-400", dot: "bg-gray-500" };
 
                   const StatusIcon = statusConfig.icon;
+                  const isOpening = loadingProblemId === problem.id;
 
                   return (
                     <motion.article
@@ -334,13 +348,25 @@ export default function ProblemsPage() {
                       <div className="mt-6 flex flex-wrap gap-3">
                         <motion.button
                           type="button"
+                          whileHover={{ scale: isOpening ? 1 : 1.02 }}
+                          whileTap={{ scale: isOpening ? 1 : 0.98 }}
+                          onClick={() => handleSolve(problem.id, problem.topicSlug)}
+                          disabled={Boolean(loadingProblemId)}
+                          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-950/30 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {isOpening ? <FiLoader className="h-4 w-4 animate-spin" /> : <FiArrowRight className="h-4 w-4" />}
+                          {isOpening ? "Opening playground..." : "Solve"}
+                        </motion.button>
+
+                        <motion.button
+                          type="button"
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => setSelectedProblemId(problem.id)}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-950/30"
+                          className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 py-3 text-sm font-medium text-white transition-colors hover:border-purple-400/30 hover:bg-white/5"
                         >
-                          Solve
-                          <FiArrowRight className="h-4 w-4" />
+                          <FiEye className="h-4 w-4" />
+                          View details
                         </motion.button>
 
                         <Link
@@ -471,9 +497,18 @@ export default function ProblemsPage() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSolve(selectedProblem.id, selectedProblem.topicSlug)}
+                    disabled={Boolean(loadingProblemId)}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {loadingProblemId === selectedProblem.id ? <FiLoader className="h-4 w-4 animate-spin" /> : <FiArrowRight className="h-4 w-4" />}
+                    {loadingProblemId === selectedProblem.id ? "Opening playground..." : "Solve in playground"}
+                  </button>
                   <Link
                     href={`/topics/${selectedProblem.topicSlug}`}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-fuchsia-500 px-5 py-3 text-sm font-semibold text-white"
+                    className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-5 py-3 text-sm font-medium text-white"
                   >
                     Open lesson
                     <FiArrowRight className="h-4 w-4" />
