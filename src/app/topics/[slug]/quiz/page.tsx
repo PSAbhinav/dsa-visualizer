@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { signIn, useSession } from "next-auth/react";
 import { QuizCard } from "@/components/quiz/QuizCard";
 import { QuizResults } from "@/components/quiz/QuizResults";
 import { PageTransition } from "@/components/layout/PageTransition";
@@ -19,12 +20,27 @@ function formatTimer(totalSeconds: number) {
 
 export default function TopicQuizPage() {
   const params = useParams();
+  const { data: session, status } = useSession();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const topic = getTopicBySlug(slug ?? "");
   const quiz = getQuizByTopicSlug(slug ?? "");
   const topicProgress = useStore((state) => (slug ? state.topicProgress[slug] : undefined));
-  const bestScore = useStore((state) => (slug ? state.bestScores.get(slug) ?? 0 : 0));
-  const quizHistory = useStore((state) => (slug ? state.quizHistory.filter((attempt) => attempt.topicSlug === slug) : []));
+  const bestScore = useStore((state) => {
+    if (!slug) return 0;
+    try {
+      return state.bestScores?.get?.(slug) ?? 0;
+    } catch {
+      return 0;
+    }
+  });
+  const quizHistory = useStore((state) => {
+    if (!slug) return [];
+    try {
+      return state.quizHistory?.filter?.((attempt) => attempt.topicSlug === slug) ?? [];
+    } catch {
+      return [];
+    }
+  });
   const recordQuizAttempt = useStore((state) => state.recordQuizAttempt);
 
   const totalQuestions = quiz?.questions.length ?? 0;
@@ -38,6 +54,44 @@ export default function TopicQuizPage() {
   const [finalTime, setFinalTime] = useState(0);
   const startedAtRef = useRef(0);
   const hasRecordedAttemptRef = useRef(false);
+
+  // Auth check - show loading or sign in prompt
+  if (status === "loading") {
+    return (
+      <PageTransition>
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
+            <div className="mb-4 h-12 w-12 mx-auto animate-spin rounded-full border-4 border-purple-500 border-t-transparent" />
+            <p className="text-gray-400">Loading...</p>
+          </motion.div>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <PageTransition>
+        <div className="mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-xl rounded-3xl border border-white/10 bg-gray-900/70 p-8 text-center"
+          >
+            <div className="mb-4 text-6xl">🔐</div>
+            <h1 className="mb-3 text-3xl font-bold text-white">Sign In Required</h1>
+            <p className="mb-6 text-gray-400">Please sign in to take quizzes and track your scores.</p>
+            <button
+              onClick={() => signIn("google")}
+              className="inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:scale-105"
+            >
+              Sign in with Google
+            </button>
+          </motion.div>
+        </div>
+      </PageTransition>
+    );
+  }
 
   useEffect(() => {
     if (!quiz || isComplete) {
