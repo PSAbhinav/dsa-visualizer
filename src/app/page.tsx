@@ -256,7 +256,17 @@ function RotatingQuote() {
 export default function HomePage() {
   const router = useRouter();
   const { success } = useToast();
-  const { selectedLevel, completedTopics, topicProgress, problemHistory, conceptMastery } = useStore();
+  const selectedLevel = useStore((state) => state.selectedLevel);
+  const completedTopics = useStore((state) => state.completedTopics ?? []);
+  const topicProgress = useStore((state) => state.topicProgress ?? {});
+  const problemHistory = useStore((state) => state.problemHistory ?? []);
+  const conceptMastery = useStore((state) => {
+    try {
+      return state.conceptMastery ?? new Map();
+    } catch {
+      return new Map();
+    }
+  });
   const hasShownRecommendationToast = useRef(false);
   const featuresRef = useRef<HTMLElement | null>(null);
   const statsRef = useRef<HTMLElement | null>(null);
