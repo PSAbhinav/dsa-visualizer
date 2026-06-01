@@ -122,7 +122,8 @@ export function LinkedListVisualizer() {
     const nextNode = nodes[index + 1];
     const nextNodes = nodes.filter((_, currentIndex) => currentIndex !== index);
 
-    setHighlightedIndex(index);
+    const nextHighlightIndex = nextNodes.length > 0 ? Math.min(index, nextNodes.length - 1) : null;
+
     setCurrentNodeValue(removedNode.value);
     setCurrentAction(`Removing node ${removedNode.value}.`);
 
@@ -153,8 +154,8 @@ export function LinkedListVisualizer() {
 
     setNodes(nextNodes);
     setCurrentPath(nextNodes.map((node) => node.value));
-    setHighlightedIndex(nextNodes.length > 0 ? Math.min(index, nextNodes.length - 1) : null);
-    setCurrentNodeValue(nextNodes.length > 0 ? nextNodes[Math.min(index, nextNodes.length - 1)].value : null);
+    setHighlightedIndex(nextHighlightIndex);
+    setCurrentNodeValue(nextHighlightIndex !== null ? nextNodes[nextHighlightIndex].value : null);
   };
 
   const reverseList = async () => {

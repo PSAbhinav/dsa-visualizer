@@ -28,15 +28,16 @@ function formatIndices(indices: number[]) {
 }
 
 function formatSortedValues(array: number[], indices: number[]) {
-  if (indices.length === 0) {
+  const validIndices = [...indices]
+    .filter((index) => index >= 0 && index < array.length)
+    .sort((left, right) => left - right)
+    .slice(0, 8);
+
+  if (validIndices.length === 0) {
     return "None yet";
   }
 
-  return [...indices]
-    .sort((left, right) => left - right)
-    .slice(0, 8)
-    .map((index) => `${index}:${array[index]}`)
-    .join(" • ");
+  return validIndices.map((index) => `${index}:${array[index]}`).join(" • ");
 }
 
 export function SortingVisualizer() {
