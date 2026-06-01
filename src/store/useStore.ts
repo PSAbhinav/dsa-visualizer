@@ -11,6 +11,12 @@ import {
   type EfficiencyStats,
   type TopicMastery,
 } from "@/lib/analytics";
+import { TOPIC_UNLOCK_SCORE } from "@/data/topicDependencies";
+import {
+  getCompletedVideoIds,
+  sanitizeVideoProgressEntry,
+  type VideoProgressEntry,
+} from "@/lib/videoProgress";
 
 export type ProblemAttempt = AnalyticsAttempt;
 
@@ -18,6 +24,7 @@ export interface TopicProgressEntry {
   started: boolean;
   visualizerViewed: boolean;
   videosWatched: string[];
+  videoProgress: VideoProgressEntry[];
   algorithmRead: boolean;
   quizScore?: number;
   completedAt?: string;
@@ -44,6 +51,7 @@ export interface QuizAttempt {
   totalQuestions: number;
   timeTaken: number;
   attemptedAt: string;
+  questionIdsShown: string[];
 }
 
 export interface DailyStreak {
@@ -112,6 +120,7 @@ export interface AppState extends ProgressState {
   markTopicStarted: (slug: string) => void;
   markVisualizerViewed: (slug: string) => void;
   markVideoWatched: (slug: string, videoId: string) => void;
+  updateVideoProgress: (slug: string, progress: VideoProgressEntry) => void;
   markAlgorithmRead: (slug: string) => void;
   setQuizScore: (slug: string, score: number) => void;
   recordQuizAttempt: (attempt: QuizAttempt) => void;
@@ -134,6 +143,7 @@ const createDefaultTopicProgressEntry = (): TopicProgressEntry => ({
   started: false,
   visualizerViewed: false,
   videosWatched: [],
+  videoProgress: [],
   algorithmRead: false,
   timeSpent: 0,
 });
@@ -245,10 +255,34 @@ const sanitizeTopicProgressEntry = (value: unknown): TopicProgressEntry => {
     return createDefaultTopicProgressEntry();
   }
 
+  const legacyVideosWatched = uniqueStrings(value.videosWatched);
+  const rawVideoProgress = Array.isArray(value.videoProgress) ? value.videoProgress : [];
+  const videoProgress = rawVideoProgress
+    .filter(
+      (entry): entry is Partial<VideoProgressEntry> & Pick<VideoProgressEntry, "videoId"> =>
+        isRecord(entry) && isString(entry.videoId)
+    )
+    .map((entry) => sanitizeVideoProgressEntry(entry));
+  const mergedVideoProgress = [...videoProgress];
+  const existingVideoIds = new Set(videoProgress.map((entry) => entry.videoId));
+
+  legacyVideosWatched.forEach((videoId) => {
+    if (!existingVideoIds.has(videoId)) {
+      mergedVideoProgress.push(
+        sanitizeVideoProgressEntry({
+          videoId,
+          watchedPercentage: 100,
+          playbackSpeed: 1,
+        })
+      );
+    }
+  });
+
   return {
     started: Boolean(value.started),
     visualizerViewed: Boolean(value.visualizerViewed),
-    videosWatched: uniqueStrings(value.videosWatched),
+    videosWatched: getCompletedVideoIds({ videosWatched: legacyVideosWatched, videoProgress: mergedVideoProgress }),
+    videoProgress: mergedVideoProgress,
     algorithmRead: Boolean(value.algorithmRead),
     quizScore: isNumber(value.quizScore) ? clamp(Math.round(value.quizScore), QUIZ_MIN, QUIZ_MAX) : undefined,
     completedAt: isString(value.completedAt) ? value.completedAt : undefined,
@@ -284,6 +318,7 @@ const sanitizeQuizHistory = (value: unknown): QuizAttempt[] => {
       score: clamp(Math.round(attempt.score), QUIZ_MIN, QUIZ_MAX),
       totalQuestions: Math.max(1, Math.round(attempt.totalQuestions)),
       timeTaken: Math.max(0, Math.round(attempt.timeTaken)),
+      questionIdsShown: uniqueStrings(attempt.questionIdsShown),
     }));
 };
 
@@ -424,7 +459,7 @@ const buildConceptMasteryFromState = (
     const visualSignals = clampScore(
       (progress.timeSpent / (12 * 60)) * 100 +
         (progress.visualizerViewed ? 10 : 0) +
-        progress.videosWatched.length * 4 +
+        getCompletedVideoIds(progress).length * 4 +
         (progress.algorithmRead ? 6 : 0)
     );
     const quizScore =
@@ -511,7 +546,10 @@ const recalculateProgressState = (
   const completedFromProgress = Object.entries(state.topicProgress)
     .filter(([, progress]) => Boolean(progress.completedAt))
     .map(([slug]) => slug);
-  const completedTopics = [...new Set([...state.completedTopics, ...completedFromProgress])];
+  const completedFromScores = [...state.bestScores.entries()]
+    .filter(([, score]) => score >= TOPIC_UNLOCK_SCORE)
+    .map(([slug]) => slug);
+  const completedTopics = [...new Set([...state.completedTopics, ...completedFromProgress, ...completedFromScores])];
   const topicEntries = Object.values(state.topicProgress);
   const totalTimeSpent = topicEntries.reduce((total, progress) => total + progress.timeSpent, 0);
   const playgroundHistory = state.playgroundHistory.length > 0 ? state.playgroundHistory : state.playgroundSubmissions;
@@ -669,6 +707,7 @@ export const getProgressSnapshot = (state: Pick<AppState, keyof ProgressState>):
       {
         ...progress,
         videosWatched: [...progress.videosWatched],
+        videoProgress: progress.videoProgress.map((entry) => ({ ...entry })),
       },
     ])
   ),
@@ -676,7 +715,7 @@ export const getProgressSnapshot = (state: Pick<AppState, keyof ProgressState>):
   playgroundHistory: state.playgroundHistory.map((submission) => ({ ...submission })),
   playgroundSuccessCount: state.playgroundSuccessCount,
   playgroundFailureCount: state.playgroundFailureCount,
-  quizHistory: state.quizHistory.map((attempt) => ({ ...attempt })),
+  quizHistory: state.quizHistory.map((attempt) => ({ ...attempt, questionIdsShown: [...attempt.questionIdsShown] })),
   dailyStreak: { ...state.dailyStreak },
   learningStats: { ...state.learningStats },
   activityLog: Object.fromEntries(
@@ -730,11 +769,57 @@ export const useStore = create<AppState>()(
           updateTopicProgress(
             state,
             slug,
-            (progress) => ({
-              ...progress,
-              videosWatched: videoId ? [...new Set([...progress.videosWatched, videoId])] : progress.videosWatched,
-            }),
+            (progress) => {
+              if (!videoId) {
+                return progress;
+              }
+
+              const existingEntry = progress.videoProgress.find((entry) => entry.videoId === videoId);
+              const nextEntry = sanitizeVideoProgressEntry(
+                {
+                  videoId,
+                  watchedPercentage: 100,
+                  playbackSpeed: existingEntry?.playbackSpeed ?? 1,
+                  completedAt: existingEntry?.completedAt,
+                },
+                existingEntry
+              );
+              const nextVideoProgress = existingEntry
+                ? progress.videoProgress.map((entry) => (entry.videoId === videoId ? nextEntry : entry))
+                : [...progress.videoProgress, nextEntry];
+
+              return {
+                ...progress,
+                videoProgress: nextVideoProgress,
+                videosWatched: getCompletedVideoIds({ videosWatched: progress.videosWatched, videoProgress: nextVideoProgress }),
+              };
+            },
             { countIncrement: 1 }
+          )
+        ),
+      updateVideoProgress: (slug, videoProgress) =>
+        set((state) =>
+          updateTopicProgress(
+            state,
+            slug,
+            (progress) => {
+              if (!videoProgress?.videoId) {
+                return progress;
+              }
+
+              const existingEntry = progress.videoProgress.find((entry) => entry.videoId === videoProgress.videoId);
+              const nextEntry = sanitizeVideoProgressEntry(videoProgress, existingEntry);
+              const nextVideoProgress = existingEntry
+                ? progress.videoProgress.map((entry) => (entry.videoId === nextEntry.videoId ? nextEntry : entry))
+                : [...progress.videoProgress, nextEntry];
+
+              return {
+                ...progress,
+                videoProgress: nextVideoProgress,
+                videosWatched: getCompletedVideoIds({ videosWatched: progress.videosWatched, videoProgress: nextVideoProgress }),
+              };
+            },
+            { countIncrement: 0 }
           )
         ),
       markAlgorithmRead: (slug) =>
@@ -764,9 +849,10 @@ export const useStore = create<AppState>()(
               bestScores,
             },
             slug,
-            (progress) => ({
+            (progress, timestamp) => ({
               ...progress,
               quizScore: safeScore,
+              completedAt: safeScore >= TOPIC_UNLOCK_SCORE ? progress.completedAt ?? timestamp : progress.completedAt,
             }),
             { countIncrement: 1 }
           );
@@ -782,6 +868,7 @@ export const useStore = create<AppState>()(
           const score = clamp(Math.round(attempt.score), QUIZ_MIN, QUIZ_MAX);
           const totalQuestions = Math.max(1, Math.round(attempt.totalQuestions));
           const timeTaken = Math.max(0, Math.round(attempt.timeTaken));
+          const questionIdsShown = uniqueStrings((attempt as unknown as Record<string, unknown>).questionIdsShown);
           const bestScores = new Map(state.bestScores);
 
           if (topicSlug) {
@@ -800,13 +887,18 @@ export const useStore = create<AppState>()(
                   totalQuestions,
                   timeTaken,
                   attemptedAt: timestamp,
+                  questionIdsShown,
                 },
               ],
             },
             topicSlug,
-            (progress) => ({
+            (progress, timestamp) => ({
               ...progress,
               quizScore: Math.max(progress.quizScore ?? 0, score),
+              completedAt:
+                score >= TOPIC_UNLOCK_SCORE || (progress.quizScore ?? 0) >= TOPIC_UNLOCK_SCORE
+                  ? progress.completedAt ?? timestamp
+                  : progress.completedAt,
             }),
             { timestamp, countIncrement: 1 }
           );
@@ -897,7 +989,7 @@ export const useStore = create<AppState>()(
       name: "dsa-visualizer-store",
       storage: createJSONStorage(() => localStorage),
       partialize: (state): PersistedAppState => getProgressSnapshot(state),
-      version: 4,
+      version: 5,
       merge: (persistedState, currentState) => ({
         ...currentState,
         ...sanitizeProgressState((persistedState as Partial<PersistedProgressState>) ?? undefined),

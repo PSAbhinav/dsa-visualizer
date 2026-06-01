@@ -2,6 +2,7 @@ import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { arrayUnion, doc, getDoc, serverTimestamp, setDoc, type DocumentData } from "firebase/firestore";
 import type { Level } from "@/data/topics";
 import { defaultEfficiencyStats, type EfficiencyStats, type TopicMastery } from "@/lib/analytics";
+import { getCompletedVideoIds, sanitizeVideoProgressEntry, type VideoProgressEntry } from "@/lib/videoProgress";
 import type {
   ActivityLog,
   DailyStreak,
@@ -82,15 +83,40 @@ const sanitizeTopicProgressEntry = (value: unknown): TopicProgressEntry => {
       started: false,
       visualizerViewed: false,
       videosWatched: [],
+      videoProgress: [],
       algorithmRead: false,
       timeSpent: 0,
     };
   }
 
+  const legacyVideosWatched = uniqueStrings(value.videosWatched);
+  const rawVideoProgress = Array.isArray(value.videoProgress) ? value.videoProgress : [];
+  const videoProgress = rawVideoProgress
+    .filter(
+      (entry): entry is Partial<VideoProgressEntry> & Pick<VideoProgressEntry, "videoId"> =>
+        isRecord(entry) && isString(entry.videoId)
+    )
+    .map((entry) => sanitizeVideoProgressEntry(entry));
+  const mergedVideoProgress = [...videoProgress];
+  const existingVideoIds = new Set(videoProgress.map((entry) => entry.videoId));
+
+  legacyVideosWatched.forEach((videoId) => {
+    if (!existingVideoIds.has(videoId)) {
+      mergedVideoProgress.push(
+        sanitizeVideoProgressEntry({
+          videoId,
+          watchedPercentage: 100,
+          playbackSpeed: 1,
+        })
+      );
+    }
+  });
+
   return {
     started: Boolean(value.started),
     visualizerViewed: Boolean(value.visualizerViewed),
-    videosWatched: uniqueStrings(value.videosWatched),
+    videosWatched: getCompletedVideoIds({ videosWatched: legacyVideosWatched, videoProgress: mergedVideoProgress }),
+    videoProgress: mergedVideoProgress,
     algorithmRead: Boolean(value.algorithmRead),
     quizScore: isNumber(value.quizScore) ? Math.max(0, Math.min(100, Math.round(value.quizScore))) : undefined,
     completedAt: isString(value.completedAt) ? value.completedAt : undefined,
@@ -223,6 +249,17 @@ const isQuizAttempt = (value: unknown): value is QuizAttempt => {
   );
 };
 
+const sanitizeQuizHistory = (value: unknown): QuizAttempt[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isQuizAttempt).map((attempt) => ({
+    ...attempt,
+    questionIdsShown: uniqueStrings((attempt as unknown as Record<string, unknown>).questionIdsShown),
+  }));
+};
+
 const sanitizeBestScoreEntries = (value: unknown): Array<[string, number]> => {
   if (!Array.isArray(value)) {
     return [];
@@ -262,7 +299,7 @@ const sanitizeUserProfile = (data: DocumentData | undefined): UserProfile => {
     playgroundFailureCount: isNumber(data?.playgroundFailureCount)
       ? Math.max(0, Math.round(data.playgroundFailureCount))
       : playgroundHistory.filter((submission) => !submission.passed).length,
-    quizHistory: Array.isArray(data?.quizHistory) ? data.quizHistory.filter(isQuizAttempt) : [],
+    quizHistory: sanitizeQuizHistory(data?.quizHistory),
     bestScoreEntries: sanitizeBestScoreEntries(data?.bestScoreEntries),
     dailyStreak: sanitizeDailyStreak(data?.dailyStreak),
     learningStats: sanitizeLearningStats(data?.learningStats),
@@ -307,7 +344,7 @@ const sanitizeUserProfilePatch = (data: UserProfilePatch): UserProfilePatch => {
       : 0;
   }
   if ("quizHistory" in data) {
-    patch.quizHistory = Array.isArray(data.quizHistory) ? data.quizHistory.filter(isQuizAttempt) : [];
+    patch.quizHistory = sanitizeQuizHistory(data.quizHistory);
   }
   if ("bestScoreEntries" in data) {
     patch.bestScoreEntries = sanitizeBestScoreEntries(data.bestScoreEntries);

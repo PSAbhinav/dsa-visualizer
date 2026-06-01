@@ -3,13 +3,14 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { QuizCard } from "@/components/quiz/QuizCard";
 import { QuizResults } from "@/components/quiz/QuizResults";
 import { PageTransition } from "@/components/layout/PageTransition";
-import { getQuizByTopicSlug } from "@/data/quizzes";
+import { getRandomizedQuiz } from "@/data/quizzes";
 import { getTopicBySlug } from "@/data/topics";
+import type { Quiz } from "@/data/types";
 import { useStore } from "@/store/useStore";
 
 function formatTimer(totalSeconds: number) {
@@ -20,10 +21,9 @@ function formatTimer(totalSeconds: number) {
 
 export default function TopicQuizPage() {
   const params = useParams();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const topic = getTopicBySlug(slug ?? "");
-  const quiz = getQuizByTopicSlug(slug ?? "");
   const topicProgress = useStore((state) => (slug ? state.topicProgress[slug] : undefined));
   const bestScore = useStore((state) => {
     if (!slug) return 0;
@@ -43,8 +43,23 @@ export default function TopicQuizPage() {
       return [];
     }
   }, [allQuizHistory, slug]);
+  const questionIdsSeen = useMemo(
+    () => Array.from(new Set(quizHistory.flatMap((attempt) => attempt.questionIdsShown ?? []))),
+    [quizHistory]
+  );
+  const seenQuestionIdsRef = useRef(questionIdsSeen);
   const recordQuizAttempt = useStore((state) => state.recordQuizAttempt);
+  const createRandomizedQuiz = useCallback(
+    (extraQuestionIds: string[] = []) => {
+      if (!slug) {
+        return undefined;
+      }
 
+      return getRandomizedQuiz(slug, 8, [...seenQuestionIdsRef.current, ...extraQuestionIds]);
+    },
+    [slug]
+  );
+  const [quiz, setQuiz] = useState<Quiz | undefined>(() => (slug ? getRandomizedQuiz(slug, 8, questionIdsSeen) : undefined));
   const totalQuestions = quiz?.questions.length ?? 0;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -56,6 +71,17 @@ export default function TopicQuizPage() {
   const [finalTime, setFinalTime] = useState(0);
   const startedAtRef = useRef(0);
   const hasRecordedAttemptRef = useRef(false);
+
+  const resetQuizState = useCallback((nextQuiz?: Quiz) => {
+    startedAtRef.current = Date.now();
+    hasRecordedAttemptRef.current = false;
+    setElapsedSeconds(0);
+    setFinalTime(0);
+    setCurrentIndex(0);
+    setSelectedAnswer(null);
+    setSubmittedAnswers(Array.from({ length: nextQuiz?.questions.length ?? 0 }, () => null));
+    setIsComplete(false);
+  }, []);
 
   const currentQuestion = quiz?.questions[currentIndex];
   const submittedAnswer = submittedAnswers[currentIndex] ?? null;
@@ -70,6 +96,17 @@ export default function TopicQuizPage() {
   }, [quiz, submittedAnswers]);
 
   // All useEffects MUST be before conditional returns (Rules of Hooks)
+  useEffect(() => {
+    seenQuestionIdsRef.current = questionIdsSeen;
+  }, [questionIdsSeen]);
+
+  useEffect(() => {
+    const nextQuiz = createRandomizedQuiz();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setQuiz(nextQuiz);
+    resetQuizState(nextQuiz);
+  }, [createRandomizedQuiz, resetQuizState]);
+
   useEffect(() => {
     if (!quiz || isComplete || status !== "authenticated") {
       return;
@@ -100,6 +137,7 @@ export default function TopicQuizPage() {
       totalQuestions: quiz.questions.length,
       timeTaken: finalTime,
       attemptedAt: new Date().toISOString(),
+      questionIdsShown: quiz.questions.map((question) => question.id),
     });
   }, [finalTime, isComplete, quiz, recordQuizAttempt, submittedAnswers, topic, status]);
 
@@ -175,14 +213,9 @@ export default function TopicQuizPage() {
       return;
     }
 
-    startedAtRef.current = Date.now();
-    hasRecordedAttemptRef.current = false;
-    setElapsedSeconds(0);
-    setFinalTime(0);
-    setCurrentIndex(0);
-    setSelectedAnswer(null);
-    setSubmittedAnswers(Array.from({ length: quiz.questions.length }, () => null));
-    setIsComplete(false);
+    const nextQuiz = createRandomizedQuiz(quiz.questions.map((question) => question.id));
+    setQuiz(nextQuiz);
+    resetQuizState(nextQuiz);
   };
 
   if (!topic || !quiz) {

@@ -1,6 +1,7 @@
 export type { Level, ProgrammingLanguage, CodeImplementation, Algorithm, Problem, Topic, YouTubeVideo } from "./types";
 import type { Level, Algorithm, Problem, Topic } from "./types";
 import * as algoCode from "./algorithmCode";
+import { getTopicPrerequisites } from "./topicDependencies";
 
 export const levels: { id: Level; title: string; description: string; icon: string; color: string }[] = [
   {
@@ -33,7 +34,7 @@ export const levels: { id: Level; title: string; description: string; icon: stri
   },
 ];
 
-export const topics: Topic[] = [
+const baseTopics: Topic[] = [
   // ===== BEGINNER TOPICS =====
   {
     slug: "arrays",
@@ -57,12 +58,14 @@ Key Concepts:
         title: "Arrays in programming - fundamentals",
         channel: "mycodeschool",
         duration: "10:14",
+      isCore: true,
       },
       {
         id: "KLlXCFG5TnA",
         title: "Two Sum - Leetcode 1 - HashMap - Python",
         channel: "NeetCode",
         duration: "8:26",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -226,12 +229,14 @@ Key Concepts:
         title: "Valid Palindrome - Leetcode 125 - Python",
         channel: "NeetCode",
         duration: "14:58",
+      isCore: true,
       },
       {
         id: "9UtInBqnCgA",
         title: "Valid Anagram - Leetcode 242 - Python",
         channel: "NeetCode",
         duration: "12:01",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -380,12 +385,14 @@ Key Concepts:
         title: "Introduction to linked list",
         channel: "mycodeschool",
         duration: "17:13",
+      isCore: true,
       },
       {
         id: "G0_I-ZF0S38",
         title: "Reverse Linked List - Iterative AND Recursive - Leetcode 206 - Python",
         channel: "NeetCode",
         duration: "11:07",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -526,12 +533,14 @@ Key Concepts:
         title: "Data structures: Array implementation of stacks",
         channel: "mycodeschool",
         duration: "13:09",
+      isCore: true,
       },
       {
         id: "WTzjTskDFMg",
         title: "Valid Parentheses - Stack - Leetcode 20 - Python",
         channel: "NeetCode",
         duration: "10:43",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -667,12 +676,14 @@ Key Concepts:
         title: "Data structures: Introduction to Queues",
         channel: "mycodeschool",
         duration: "9:19",
+      isCore: true,
       },
       {
         id: "KxzhEQ-zpDc",
         title: "Queue Introduction",
         channel: "WilliamFiset",
         duration: "6:26",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -790,12 +801,14 @@ Key Concepts:
         title: "2.7.2.  Merge Sort Algorithm",
         channel: "Abdul Bari",
         duration: "20:23",
+      isCore: true,
       },
       {
         id: "7h1s2SojIRw",
         title: "2.8.1  QuickSort Algorithm",
         channel: "Abdul Bari",
         duration: "13:43",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -953,12 +966,14 @@ Key Concepts:
         title: "2.6.1 Binary Search Iterative Method",
         channel: "Abdul Bari",
         duration: "19:36",
+      isCore: true,
       },
       {
         id: "s4DPM8ct1pI",
         title: "Binary Search - Leetcode 704 - Python",
         channel: "NeetCode",
         duration: "9:40",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1085,12 +1100,14 @@ Key Concepts:
         title: "Finding Prime numbers - Sieve of Eratosthenes",
         channel: "mycodeschool",
         duration: "9:54",
+      isCore: true,
       },
       {
         id: "g9YQyYi4IQQ",
         title: "Pow(x, n) - X to the power of N - Leetcode 50 - Python",
         channel: "NeetCode",
         duration: "12:37",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1184,12 +1201,14 @@ Key Concepts:
         title: "Spiral Matrix - Microsoft Interview Question - Leetcode 54",
         channel: "NeetCode",
         duration: "16:46",
+      isCore: true,
       },
       {
         id: "T41rL0L3Pnw",
         title: "Set Matrix Zeroes - In-place - Leetcode 73",
         channel: "NeetCode",
         duration: "18:05",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1284,12 +1303,14 @@ Key Concepts:
         title: "Data structures: Binary Tree",
         channel: "mycodeschool",
         duration: "16:17",
+      isCore: true,
       },
       {
         id: "6ZnyEApgFYg",
         title: "Binary Tree Level Order Traversal - BFS - Leetcode 102",
         channel: "NeetCode",
         duration: "9:36",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1431,12 +1452,14 @@ Key Concepts:
         title: "Data structures: Binary Search Tree",
         channel: "mycodeschool",
         duration: "19:28",
+      isCore: true,
       },
       {
         id: "s6ATEkipzow",
         title: "Validate Binary Search Tree - Depth First Search - Leetcode 98",
         channel: "NeetCode",
         duration: "9:56",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1559,12 +1582,14 @@ Key Concepts:
         title: "Hash tables in 4 minutes",
         channel: "Michael Sambol",
         duration: "3:52",
+      isCore: true,
       },
       {
         id: "vzdNOK2oB2E",
         title: "Group Anagrams - Categorize Strings by Count - Leetcode 49",
         channel: "NeetCode",
         duration: "8:12",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1654,12 +1679,14 @@ Key Concepts:
         title: "Priority Queue Introduction",
         channel: "WilliamFiset",
         duration: "13:18",
+      isCore: true,
       },
       {
         id: "XEmy13g1Qxc",
         title: "Kth Largest Element in an Array - Quick Select - Leetcode 215 - Python",
         channel: "NeetCode",
         duration: "18:48",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1782,12 +1809,14 @@ Key Concepts:
         title: "Subsets - Backtracking - Leetcode 78",
         channel: "NeetCode",
         duration: "8:47",
+      isCore: true,
       },
       {
         id: "xouin83ebxE",
         title: "N Queen Problem Using Backtracking Algorithm",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "18:04",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -1917,12 +1946,14 @@ Key Concepts:
         title: "3Sum - Leetcode 15 - Python",
         channel: "NeetCode",
         duration: "12:54",
+      isCore: true,
       },
       {
         id: "wiGpQwVHdE0",
         title: "Longest Substring Without Repeating Characters - Leetcode 3 - Python",
         channel: "NeetCode",
         duration: "6:46",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2055,12 +2086,14 @@ Key Concepts:
         title: "3. Greedy Method -  Introduction",
         channel: "Abdul Bari",
         duration: "12:02",
+      isCore: true,
       },
       {
         id: "Yan0cv2cLy8",
         title: "Jump Game - Greedy - Leetcode 55",
         channel: "NeetCode",
         duration: "16:28",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2197,12 +2230,14 @@ Key Concepts:
         title: "Object-Oriented Programming, Simplified",
         channel: "Programming with Mosh",
         duration: "7:34",
+      isCore: true,
       },
       {
         id: "SiBw7os-_zI",
         title: "Intro to Object Oriented Programming - Crash Course",
         channel: "freeCodeCamp.org",
         duration: "30:18",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2299,12 +2334,14 @@ Key Concepts:
         title: "Graph Theory Introduction",
         channel: "WilliamFiset",
         duration: "14:08",
+      isCore: true,
       },
       {
         id: "7fujbpJ0LB4",
         title: "Depth First Search Algorithm | Graph Theory",
         channel: "WilliamFiset",
         duration: "10:20",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2452,12 +2489,14 @@ Key Concepts:
         title: "0/1 Knapsack Problem Dynamic Programming",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "15:50",
+      isCore: true,
       },
       {
         id: "Y0lT9Fck7qI",
         title: "Climbing Stairs - Dynamic Programming - Leetcode 70 - Python",
         channel: "NeetCode",
         duration: "18:08",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2622,12 +2661,14 @@ Key Concepts:
         title: "Trie Data Structure",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "19:40",
+      isCore: true,
       },
       {
         id: "oobqoCJlHA0",
         title: "Implement Trie (Prefix Tree) - Leetcode 208",
         channel: "NeetCode",
         duration: "18:56",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2725,12 +2766,14 @@ Key Concepts:
         title: "2 Divide And Conquer",
         channel: "Abdul Bari",
         duration: "7:04",
+      isCore: true,
       },
       {
         id: "0oJyNmEbS4w",
         title: "2.9 Strassens Matrix Multiplication",
         channel: "Abdul Bari",
         duration: "23:40",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2825,12 +2868,14 @@ Key Concepts:
         title: "Single Number - Leetcode 136 - Python",
         channel: "NeetCode",
         duration: "7:09",
+      isCore: true,
       },
       {
         id: "5Km3utixwZs",
         title: "Number of 1 Bits - Leetcode 191 - Python",
         channel: "NeetCode",
         duration: "11:59",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -2919,12 +2964,14 @@ Key Concepts:
         title: "Segment Tree Range Minimum Query",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "27:44",
+      isCore: true,
       },
       {
         id: "CWDQJGaN1gY",
         title: "Fenwick Tree or Binary Indexed Tree",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "22:43",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3022,12 +3069,14 @@ Key Concepts:
         title: "Union Find Introduction",
         channel: "WilliamFiset",
         duration: "5:46",
+      isCore: true,
       },
       {
         id: "0jNmHPfA_yE",
         title: "Union Find - Union and Find Operations",
         channel: "WilliamFiset",
         duration: "10:53",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3121,12 +3170,14 @@ Key Concepts:
         title: "Dijkstra's Shortest Path Algorithm | Graph Theory",
         channel: "WilliamFiset",
         duration: "24:47",
+      isCore: true,
       },
       {
         id: "eL-KzMXSXXI",
         title: "Topological Sort Algorithm | Graph Theory",
         channel: "WilliamFiset",
         duration: "14:09",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3228,12 +3279,14 @@ Key Concepts:
         title: "Knuth–Morris–Pratt(KMP) Pattern Matching(Substring search)",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "12:50",
+      isCore: true,
       },
       {
         id: "H4VrKHVG5qI",
         title: "Rabin Karp Substring Search Pattern Matching",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "16:57",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3336,12 +3389,14 @@ Key Concepts:
         title: "Longest Increasing Subsequence",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "7:09",
+      isCore: true,
       },
       {
         id: "We3YDTzNXEk",
         title: "Minimum Edit Distance Dynamic Programming",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "9:47",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3437,12 +3492,14 @@ Key Concepts:
         title: "Max Flow Ford Fulkerson | Network Flow | Graph Theory",
         channel: "WilliamFiset",
         duration: "13:25",
+      isCore: true,
       },
       {
         id: "M6cm8UeeziI",
         title: "Dinic's Algorithm | Network Flow | Graph Theory",
         channel: "WilliamFiset",
         duration: "11:49",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3532,12 +3589,14 @@ Key Concepts:
         title: "Convex Hull Jarvis March(Gift wrapping algorithm)",
         channel: "Tushar Roy - Coding Made Simple",
         duration: "18:04",
+      isCore: true,
       },
       {
         id: "B2AJoQSZf4M",
         title: "Convex Hull Algorithm - Graham Scan and Jarvis March tutorial",
         channel: "Stable Sort",
         duration: "7:24",
+      isCore: true,
       },
     ],
     algorithms: [
@@ -3607,6 +3666,11 @@ Key Concepts:
     ] satisfies Problem[],
   },
 ];
+
+export const topics: Topic[] = baseTopics.map((topic) => ({
+  ...topic,
+  prerequisites: getTopicPrerequisites(topic.slug),
+}));
 
 export function getTopicsByLevel(level: Level): Topic[] {
   return topics.filter((t) => t.level === level);

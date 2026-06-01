@@ -1,5 +1,5 @@
 import { topics } from "./topics";
-import type { Quiz, QuizQuestion, Topic } from "./types";
+import type { Problem, Quiz, QuizQuestion, Topic } from "./types";
 
 type TopicQuizTemplate = {
   bestScenario: string;
@@ -528,9 +528,45 @@ const topicTemplates: Record<string, TopicQuizTemplate> = {
   }
 };
 
-const buildOptions = (correct: string, pool: string[]) => {
-  const distractors = pool.filter((item) => item !== correct);
-  return [correct, ...distractors].slice(0, 4);
+const QUIZ_DIFFICULTY_OPTIONS: Array<Problem["difficulty"] | "Expert"> = ["Easy", "Medium", "Hard", "Expert"];
+
+const ensureOptionCount = (options: string[], fallbackPool: string[] = []): string[] => {
+  const uniqueOptions = Array.from(new Set(options.filter(Boolean)));
+
+  for (const fallback of fallbackPool) {
+    if (uniqueOptions.length >= 4) {
+      break;
+    }
+
+    if (!uniqueOptions.includes(fallback)) {
+      uniqueOptions.push(fallback);
+    }
+  }
+
+  return uniqueOptions.slice(0, 4);
+};
+
+const buildOptions = (correct: string, pool: string[]) =>
+  ensureOptionCount([correct, ...pool.filter((item) => item !== correct)], [
+    "O(log n)",
+    "O(n)",
+    "O(n log n)",
+    "O(n²)",
+    "O(1)",
+  ]);
+
+const buildCrossTopicOptions = (
+  topicSlug: string,
+  correct: string,
+  selector: (topic: Topic) => string | undefined,
+  fallbackPool: string[] = []
+) => {
+  const distractors = topics
+    .filter((topic) => topic.slug !== topicSlug)
+    .map(selector)
+    .filter((value): value is string => Boolean(value && value !== correct));
+
+  return ensureOptionCount([correct, ...distractors], fallbackPool);
 };
 
 const buildAlgorithmOptions = (topic: Topic, correct: string) => {
@@ -540,8 +576,20 @@ const buildAlgorithmOptions = (topic: Topic, correct: string) => {
     ...FALLBACK_ALGORITHM_OPTIONS,
   ];
 
-  return Array.from(new Set(options)).slice(0, 4);
+  return ensureOptionCount(Array.from(new Set(options)), FALLBACK_ALGORITHM_OPTIONS);
 };
+
+const normalizeBullet = (line: string) => line.replace(/^•\s*/, "").trim();
+
+const getKeyConcepts = (topic: Topic) =>
+  topic.detailedExplanation
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("•"))
+    .map(normalizeBullet);
+
+const getAlgorithmAt = (topic: Topic, index: number) => topic.algorithms[index % topic.algorithms.length];
+const getProblemAt = (topic: Topic, index: number) => topic.problems[index % topic.problems.length];
 
 const createQuestion = (
   id: string,
@@ -563,9 +611,14 @@ const createQuestion = (
 
 const buildQuiz = (topic: Topic): Quiz => {
   const template = topicTemplates[topic.slug];
-  const primaryAlgorithm = topic.algorithms[0];
-  const secondaryAlgorithm = topic.algorithms[1] ?? topic.algorithms[0];
+  const primaryAlgorithm = getAlgorithmAt(topic, 0);
+  const secondaryAlgorithm = getAlgorithmAt(topic, 1);
+  const tertiaryAlgorithm = getAlgorithmAt(topic, 2);
+  const firstProblem = getProblemAt(topic, 0);
+  const secondProblem = getProblemAt(topic, 1);
+  const thirdProblem = getProblemAt(topic, 2);
   const bestAlgorithmOptions = buildAlgorithmOptions(topic, template.bestAlgorithm);
+  const keyConcept = getKeyConcepts(topic)[0] ?? topic.shortDescription;
 
   return {
     topicSlug: topic.slug,
@@ -579,11 +632,27 @@ const buildQuiz = (topic: Topic): Quiz => {
         "easy"
       ),
       createQuestion(
-        `${topic.slug}-space-secondary`,
-        `What is the extra space complexity of ${secondaryAlgorithm.name}?`,
-        buildOptions(secondaryAlgorithm.spaceComplexity, SPACE_COMPLEXITY_OPTIONS),
-        secondaryAlgorithm.spaceComplexity,
-        `${secondaryAlgorithm.name} uses ${secondaryAlgorithm.spaceComplexity} extra memory according to the lesson data.`,
+        `${topic.slug}-space-primary`,
+        `What is the extra space complexity of ${primaryAlgorithm.name}?`,
+        buildOptions(primaryAlgorithm.spaceComplexity, SPACE_COMPLEXITY_OPTIONS),
+        primaryAlgorithm.spaceComplexity,
+        `${primaryAlgorithm.name} uses ${primaryAlgorithm.spaceComplexity} extra memory according to the lesson data.`,
+        "easy"
+      ),
+      createQuestion(
+        `${topic.slug}-time-secondary`,
+        `What is the time complexity of ${secondaryAlgorithm.name}?`,
+        buildOptions(secondaryAlgorithm.timeComplexity, TIME_COMPLEXITY_OPTIONS),
+        secondaryAlgorithm.timeComplexity,
+        `${secondaryAlgorithm.name} is documented with time complexity ${secondaryAlgorithm.timeComplexity}.`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-space-tertiary`,
+        `What is the extra space complexity of ${tertiaryAlgorithm.name}?`,
+        buildOptions(tertiaryAlgorithm.spaceComplexity, SPACE_COMPLEXITY_OPTIONS),
+        tertiaryAlgorithm.spaceComplexity,
+        `${tertiaryAlgorithm.name} uses ${tertiaryAlgorithm.spaceComplexity} additional memory in the lesson content.`,
         "medium"
       ),
       createQuestion(
@@ -597,7 +666,7 @@ const buildQuiz = (topic: Topic): Quiz => {
       createQuestion(
         `${topic.slug}-code-output`,
         `What is the output of this ${topic.title.toLowerCase()} snippet?`,
-        template.codeOptions,
+        ensureOptionCount(template.codeOptions, ["undefined", "[]", "0", "false"]),
         template.codeOptions[template.codeAnswer],
         template.codeExplanation,
         "medium",
@@ -606,7 +675,7 @@ const buildQuiz = (topic: Topic): Quiz => {
       createQuestion(
         `${topic.slug}-edge-case`,
         template.edgeCaseQuestion,
-        template.edgeCaseOptions,
+        ensureOptionCount(template.edgeCaseOptions, ["It has no edge cases", "It always runs in O(1)", "It removes duplicates automatically", "It sorts the input first"]),
         template.edgeCaseOptions[template.edgeCaseAnswer],
         template.edgeCaseExplanation,
         "hard"
@@ -614,15 +683,147 @@ const buildQuiz = (topic: Topic): Quiz => {
       createQuestion(
         `${topic.slug}-concept`,
         template.conceptQuestion,
-        template.conceptOptions,
+        ensureOptionCount(template.conceptOptions, ["A heap", "A trie", "A graph cut", "A balance factor"]),
         template.conceptOptions[template.conceptAnswer],
         template.conceptExplanation,
         "hard"
       ),
+      createQuestion(
+        `${topic.slug}-identify-primary`,
+        `Which algorithm matches this description: ${primaryAlgorithm.explanation}?`,
+        buildAlgorithmOptions(topic, primaryAlgorithm.name),
+        primaryAlgorithm.name,
+        `${primaryAlgorithm.name} is the algorithm described by that explanation in this topic.`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-identify-secondary`,
+        `Which algorithm matches this description: ${secondaryAlgorithm.explanation}?`,
+        buildAlgorithmOptions(topic, secondaryAlgorithm.name),
+        secondaryAlgorithm.name,
+        `${secondaryAlgorithm.name} is the algorithm described by that explanation in this topic.`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-problem-time-1`,
+        `What time complexity target is listed for the problem "${firstProblem.title}"?`,
+        buildOptions(firstProblem.expectedTimeComplexity, TIME_COMPLEXITY_OPTIONS),
+        firstProblem.expectedTimeComplexity,
+        `The lesson lists ${firstProblem.expectedTimeComplexity} as the expected time complexity for "${firstProblem.title}".`,
+        "easy"
+      ),
+      createQuestion(
+        `${topic.slug}-problem-space-2`,
+        `What space complexity target is listed for the problem "${secondProblem.title}"?`,
+        buildOptions(secondProblem.expectedSpaceComplexity, SPACE_COMPLEXITY_OPTIONS),
+        secondProblem.expectedSpaceComplexity,
+        `The lesson lists ${secondProblem.expectedSpaceComplexity} as the expected space complexity for "${secondProblem.title}".`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-problem-difficulty-3`,
+        `What difficulty is assigned to the problem "${thirdProblem.title}"?`,
+        ensureOptionCount(
+          [thirdProblem.difficulty, ...QUIZ_DIFFICULTY_OPTIONS.filter((difficulty) => difficulty !== thirdProblem.difficulty)],
+          QUIZ_DIFFICULTY_OPTIONS.map((difficulty) => difficulty.toString())
+        ),
+        thirdProblem.difficulty,
+        `"${thirdProblem.title}" is labeled ${thirdProblem.difficulty} in the lesson data.`,
+        "easy"
+      ),
+      createQuestion(
+        `${topic.slug}-key-concept`,
+        `Which key idea is explicitly highlighted in the ${topic.title} lesson?`,
+        buildCrossTopicOptions(topic.slug, keyConcept, (candidateTopic) => getKeyConcepts(candidateTopic)[0], [topic.shortDescription]),
+        keyConcept,
+        `That bullet point appears directly in the ${topic.title} key concepts section.`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-analogy`,
+        `Which real-world analogy is used for ${topic.title}?`,
+        buildCrossTopicOptions(topic.slug, topic.realWorldAnalogy, (candidateTopic) => candidateTopic.realWorldAnalogy),
+        topic.realWorldAnalogy,
+        `The lesson compares ${topic.title.toLowerCase()} to "${topic.realWorldAnalogy}".`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-short-description`,
+        `Which summary best describes the ${topic.title} topic?`,
+        buildCrossTopicOptions(topic.slug, topic.shortDescription, (candidateTopic) => candidateTopic.shortDescription),
+        topic.shortDescription,
+        `That summary is the short description attached to the ${topic.title} lesson.`,
+        "easy"
+      ),
+      createQuestion(
+        `${topic.slug}-algorithm-in-topic`,
+        `Which of these algorithms is included in the ${topic.title} lesson?`,
+        buildCrossTopicOptions(topic.slug, tertiaryAlgorithm.name, (candidateTopic) => candidateTopic.algorithms[0]?.name, FALLBACK_ALGORITHM_OPTIONS),
+        tertiaryAlgorithm.name,
+        `${tertiaryAlgorithm.name} is one of the named algorithms covered in ${topic.title}.`,
+        "medium"
+      ),
+      createQuestion(
+        `${topic.slug}-problem-in-topic`,
+        `Which of these practice problems belongs to the ${topic.title} topic?`,
+        buildCrossTopicOptions(topic.slug, firstProblem.title, (candidateTopic) => candidateTopic.problems[0]?.title),
+        firstProblem.title,
+        `"${firstProblem.title}" is listed as a practice problem in the ${topic.title} lesson.`,
+        "easy"
+      ),
     ],
+  };
+};
+
+const shuffleArray = <T,>(items: T[]): T[] => {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+};
+
+const randomizeQuestionOptions = (question: QuizQuestion): QuizQuestion => {
+  const randomizedOptions = shuffleArray(
+    question.options.map((option, index) => ({
+      option,
+      isCorrect: index === question.correctAnswer,
+    }))
+  );
+
+  return {
+    ...question,
+    options: randomizedOptions.map(({ option }) => option),
+    correctAnswer: randomizedOptions.findIndex(({ isCorrect }) => isCorrect),
   };
 };
 
 export const quizzes: Quiz[] = topics.map(buildQuiz);
 
 export const getQuizByTopicSlug = (topicSlug: string): Quiz | undefined => quizzes.find((quiz) => quiz.topicSlug === topicSlug);
+
+export const getRandomizedQuiz = (
+  topicSlug: string,
+  count: number = 8,
+  previouslyShownQuestionIds: string[] = []
+): Quiz | undefined => {
+  const quiz = getQuizByTopicSlug(topicSlug);
+
+  if (!quiz) {
+    return undefined;
+  }
+
+  const normalizedCount = Math.min(Math.max(Math.floor(count), 1), quiz.questions.length);
+  const seenQuestionIds = new Set(previouslyShownQuestionIds);
+  const unseenQuestions = quiz.questions.filter((question) => !seenQuestionIds.has(question.id));
+  const seenQuestions = quiz.questions.filter((question) => seenQuestionIds.has(question.id));
+  const selectedQuestions = [...shuffleArray(unseenQuestions), ...shuffleArray(seenQuestions)].slice(0, normalizedCount);
+
+  return {
+    topicSlug: quiz.topicSlug,
+    questions: shuffleArray(selectedQuestions).map(randomizeQuestionOptions),
+  };
+};

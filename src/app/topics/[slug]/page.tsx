@@ -2,15 +2,25 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
+import { TOPIC_UNLOCK_SCORE, getMissingPrerequisites, isTopicUnlocked } from "@/data/topicDependencies";
 import { getQuizByTopicSlug } from "@/data/quizzes";
 import { getTopicBySlug } from "@/data/topics";
 import type { ProgrammingLanguage } from "@/data/types";
 import { useProgressTracker, QUIZ_PASS_SCORE, formatLearningTime } from "@/hooks/useProgressTracker";
 import { PageTransition } from "@/components/layout/PageTransition";
 import { useStore } from "@/store/useStore";
+import {
+  getAdditionalVideos,
+  getCompletedCoreVideoCount,
+  getCoreVideoIds,
+  getCoreVideos,
+  getVideoProgress,
+  isVideoProgressComplete,
+  isVideoSectionComplete,
+} from "@/lib/videoProgress";
 import { FadeIn } from "@/components/ui/AnimatedComponents";
 import { ArrayVisualizer } from "@/components/visualizers/ArrayVisualizer";
 import { LinkedListVisualizer } from "@/components/visualizers/LinkedListVisualizer";
@@ -118,8 +128,7 @@ function getVisualizer(type: string) {
 
 export default function TopicDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const topic = getTopicBySlug(slug ?? "");
   const [activeTab, setActiveTab] = useState<TopicTab>("visual");
@@ -128,6 +137,11 @@ export default function TopicDetailPage() {
   const [isVisualizerFullscreen, setIsVisualizerFullscreen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const youtubeVideos = topic?.youtubeVideos ?? [];
+  const coreVideos = getCoreVideos(youtubeVideos);
+  const additionalVideos = getAdditionalVideos(youtubeVideos);
+  const coreVideoIds = getCoreVideoIds(youtubeVideos);
+  const completedTopics = useStore((state) => state.completedTopics ?? []);
+  const bestScores = useStore((state) => state.bestScores);
   const {
     topicProgress,
     completionPercentage,
@@ -137,28 +151,19 @@ export default function TopicDetailPage() {
     currentStreak,
     markVisualizerViewed,
     markAlgorithmRead,
-    markVideoWatched,
+    updateVideoProgress,
     markComplete,
-  } = useProgressTracker(topic?.slug);
+  } = useProgressTracker(topic?.slug, { coreVideoIds });
   const topicQuiz = topic ? getQuizByTopicSlug(topic.slug) : undefined;
-  const topicBestQuizScore = useStore((state) => {
-    if (!topic?.slug) return 0;
-    try {
-      return state.bestScores?.get?.(topic.slug) ?? 0;
-    } catch {
-      return 0;
-    }
-  });
-  // Get quizHistory once, then memoize filtering to prevent infinite re-renders
+  const topicBestQuizScore = topic?.slug ? bestScores.get(topic.slug) ?? 0 : 0;
   const quizHistory = useStore((state) => state.quizHistory ?? []);
-  const topicQuizAttempts = useMemo(() => {
-    if (!topic?.slug) return [];
-    try {
-      return quizHistory.filter((attempt) => attempt.topicSlug === topic.slug);
-    } catch {
-      return [];
-    }
-  }, [quizHistory, topic?.slug]);
+  const topicQuizAttempts = topic?.slug ? quizHistory.filter((attempt) => attempt.topicSlug === topic.slug) : [];
+  const isLocked = topic ? !isTopicUnlocked(topic.slug, completedTopics, bestScores) : false;
+  const missingPrerequisiteTopics = topic
+    ? getMissingPrerequisites(topic.slug, completedTopics, bestScores)
+        .map((prerequisiteSlug) => getTopicBySlug(prerequisiteSlug))
+        .filter((prerequisiteTopic): prerequisiteTopic is NonNullable<typeof prerequisiteTopic> => Boolean(prerequisiteTopic))
+    : [];
 
   const selectedAlgorithm = topic?.algorithms[selectedAlgoIndex] ?? topic?.algorithms[0];
   const availableImplementations = selectedAlgorithm?.code ?? [];
@@ -176,8 +181,10 @@ export default function TopicDetailPage() {
     javascript: "{}",
     go: "🐹",
   };
-  const videoSectionViewed = (topicProgress?.videosWatched.length ?? 0) > 0;
+  const coreVideosCompleted = getCompletedCoreVideoCount(topicProgress, coreVideoIds);
+  const videoSectionViewed = isVideoSectionComplete(topicProgress, coreVideoIds);
   const quizUnlocked = Boolean(topicProgress?.visualizerViewed) && Boolean(topicProgress?.algorithmRead);
+  const topicYoutubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`DSA ${topic?.title ?? ""} tutorial`)}`;
   const quizPassed = (topicProgress?.quizScore ?? 0) >= QUIZ_PASS_SCORE;
   const tabs = [
     { id: "visual" as const, label: "Visual", description: "Interactive walkthrough", completed: Boolean(topicProgress?.visualizerViewed) },
@@ -188,7 +195,7 @@ export default function TopicDetailPage() {
 
   // useEffect must be called before any conditional returns (Rules of Hooks)
   useEffect(() => {
-    if (!topic || status !== "authenticated") {
+    if (!topic || isLocked || status !== "authenticated") {
       return;
     }
 
@@ -199,7 +206,7 @@ export default function TopicDetailPage() {
     if (activeTab === "algorithm") {
       markAlgorithmRead();
     }
-  }, [activeTab, markAlgorithmRead, markVisualizerViewed, topic, status]);
+  }, [activeTab, isLocked, markAlgorithmRead, markVisualizerViewed, topic, status]);
 
   // Auth loading state
   if (status === "loading") {
@@ -289,6 +296,77 @@ export default function TopicDetailPage() {
               <span>←</span>
               <span>Back to Topics</span>
             </Link>
+          </motion.div>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  if (isLocked) {
+    return (
+      <PageTransition>
+        <div className="mx-auto flex min-h-[70vh] max-w-4xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="w-full overflow-hidden rounded-[2rem] border border-amber-400/20 bg-gray-900/80 shadow-2xl shadow-amber-950/20"
+          >
+            <div className="border-b border-white/10 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent p-8">
+              <div className="mb-4 text-5xl">🔒</div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200">Topic Locked</p>
+              <h1 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{topic.title} is still locked</h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+                Score {TOPIC_UNLOCK_SCORE}% or higher on each prerequisite quiz before moving on to this lesson.
+              </p>
+            </div>
+
+            <div className="space-y-6 p-8">
+              <div className="rounded-3xl border border-white/10 bg-black/20 p-6">
+                <h2 className="text-lg font-semibold text-white">Complete these topics to unlock {topic.title}</h2>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  {missingPrerequisiteTopics.map((prerequisite) => (
+                    <Link
+                      key={prerequisite.slug}
+                      href={`/topics/${prerequisite.slug}`}
+                      className="group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-purple-400/40 hover:bg-purple-500/10"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-2xl">
+                          {prerequisite.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white group-hover:text-purple-200">{prerequisite.title}</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-400">{prerequisite.shortDescription}</p>
+                          <span className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-purple-200">
+                            Open prerequisite
+                            <span aria-hidden="true">→</span>
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/topics"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                >
+                  <span>←</span>
+                  <span>Back to Topics</span>
+                </Link>
+                {missingPrerequisiteTopics[0] && (
+                  <Link
+                    href={`/topics/${missingPrerequisiteTopics[0].slug}`}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/20 transition hover:scale-[1.02]"
+                  >
+                    Start with {missingPrerequisiteTopics[0].title}
+                    <span aria-hidden="true">→</span>
+                  </Link>
+                )}
+              </div>
+            </div>
           </motion.div>
         </div>
       </PageTransition>
@@ -596,10 +674,10 @@ export default function TopicDetailPage() {
           >
             <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 shadow-lg shadow-purple-950/10 backdrop-blur-xl">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-purple-200">Watch strategy</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">Learn the pattern from multiple angles</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-purple-200">Core videos</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">Complete both required walkthroughs properly</h2>
                 <p className="mt-3 text-sm leading-7 text-slate-300">
-                  Start with the conceptual walkthrough, then move to the problem-solving video to see the pattern under pressure. Each embed loads only when you press play, so the page stays fast.
+                  Finish both core videos at 1x or 1.5x speed and reach at least 75% tracked watch time to clear this section.
                 </p>
                 <div className="mt-6 rounded-[1.5rem] border border-emerald-400/20 bg-emerald-500/10 p-5">
                   <p className="text-sm font-semibold text-emerald-100">Encouragement</p>
@@ -609,10 +687,17 @@ export default function TopicDetailPage() {
 
               <div className="rounded-[1.75rem] border border-white/10 bg-white/5 p-6 shadow-lg shadow-purple-950/10 backdrop-blur-xl">
                 <p className="text-xs font-semibold uppercase tracking-[0.28em] text-purple-200">Section status</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">Curated playlist progress</h2>
+                <h2 className="mt-2 text-2xl font-semibold text-white">Core video progress</h2>
+                <div className="mt-4 flex items-center gap-3 text-sm text-slate-300">
+                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] ${videoSectionViewed ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-200" : "border border-white/10 bg-white/5 text-slate-300"}`}>
+                    {videoSectionViewed ? "Completed" : `${coreVideosCompleted}/${coreVideoIds.length} complete`}
+                  </span>
+                  <span>Both core videos must hit 75% at 1x or 1.5x.</span>
+                </div>
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  {youtubeVideos.map((video) => {
-                    const watched = topicProgress?.videosWatched.includes(video.id) ?? false;
+                  {coreVideos.map((video) => {
+                    const videoProgress = getVideoProgress(topicProgress, video.id);
+                    const watched = isVideoProgressComplete(videoProgress);
                     return (
                       <div key={video.id} className="rounded-2xl border border-white/10 bg-black/20 p-4 transition hover:border-purple-400/30 hover:bg-white/5">
                         <div className="flex items-center justify-between gap-3">
@@ -621,24 +706,50 @@ export default function TopicDetailPage() {
                         </div>
                         <p className="mt-3 text-sm font-medium text-white">{video.title}</p>
                         <p className="mt-1 text-xs uppercase tracking-[0.2em] text-purple-200">{video.channel}</p>
+                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className={`h-full rounded-full ${watched ? "bg-gradient-to-r from-emerald-400 to-cyan-300" : "bg-gradient-to-r from-purple-400 via-fuchsia-400 to-cyan-300"}`}
+                            style={{ width: `${videoProgress?.watchedPercentage ?? 0}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">
+                          {(videoProgress?.watchedPercentage ?? 0)}% tracked • {videoProgress?.playbackSpeed ?? 1}x playback
+                        </p>
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
+                  <p className="text-sm font-semibold text-white">Explore more</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-300">
+                    {additionalVideos.length > 0
+                      ? `${additionalVideos.length} extra resource${additionalVideos.length === 1 ? " is" : "s are"} available after you finish the core videos.`
+                      : "Need another explanation style? Jump to YouTube for more beginner-friendly walkthroughs and practice videos."}
+                  </p>
+                  <a
+                    href={topicYoutubeSearchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-purple-400/40 hover:bg-purple-500/10"
+                  >
+                    Explore More on YouTube
+                  </a>
                 </div>
               </div>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              {youtubeVideos.map((video) => {
-                const watched = topicProgress?.videosWatched.includes(video.id) ?? false;
+              {coreVideos.map((video) => {
+                const videoProgress = getVideoProgress(topicProgress, video.id);
+                const watched = isVideoProgressComplete(videoProgress);
 
                 return (
                   <YouTubeEmbed
                     key={video.id}
                     video={video}
                     watched={watched}
-                    onPlay={(currentVideo) => markVideoWatched(currentVideo.id)}
-                    onWatched={(currentVideo) => markVideoWatched(currentVideo.id)}
+                    progress={videoProgress}
+                    onProgressChange={updateVideoProgress}
                   />
                 );
               })}

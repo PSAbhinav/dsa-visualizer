@@ -20,6 +20,7 @@ import {
   getRecommendedTopics,
   getWeakAreasToRevisit,
 } from "@/lib/recommendationEngine";
+import { getCoreVideoIds } from "@/lib/videoProgress";
 import { useStore } from "@/store/useStore";
 
 const glassCardClass =
@@ -147,8 +148,12 @@ export default function ProfilePage() {
     }
 
     return getMilestoneMessage(
-      inProgressTopics[0] ? calculateTopicCompletion(inProgressTopics[0].progress) : 0,
-      inProgressTopics[0] ? isTopicMastered(inProgressTopics[0].progress) : false
+      inProgressTopics[0]
+        ? calculateTopicCompletion(inProgressTopics[0].progress, getCoreVideoIds(inProgressTopics[0].topic.youtubeVideos))
+        : 0,
+      inProgressTopics[0]
+        ? isTopicMastered(inProgressTopics[0].progress, getCoreVideoIds(inProgressTopics[0].topic.youtubeVideos))
+        : false
     );
   }, [dailyStreak.currentStreak, inProgressTopics, learningStats.topicsCompleted]);
 
@@ -294,8 +299,8 @@ export default function ProfilePage() {
                   key={topic.slug}
                   topic={topic}
                   progress={progress}
-                  completionPercentage={calculateTopicCompletion(progress)}
-                  mastered={isTopicMastered(progress)}
+                  completionPercentage={calculateTopicCompletion(progress, getCoreVideoIds(topic.youtubeVideos))}
+                  mastered={isTopicMastered(progress, getCoreVideoIds(topic.youtubeVideos))}
                 />
               ))
             ) : (

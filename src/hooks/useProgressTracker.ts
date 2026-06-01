@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { isVideoSectionComplete, type VideoProgressEntry } from "@/lib/videoProgress";
 import { useStore, type AppState, type TopicProgressEntry } from "@/store/useStore";
 
 export const QUIZ_PASS_SCORE = 70;
 
-export function calculateTopicCompletion(progress?: TopicProgressEntry | null): number {
+export function calculateTopicCompletion(progress?: TopicProgressEntry | null, coreVideoIds: string[] = []): number {
   if (!progress) {
     return 0;
   }
@@ -14,15 +15,15 @@ export function calculateTopicCompletion(progress?: TopicProgressEntry | null): 
   let completion = 0;
 
   if (progress.visualizerViewed) completion += 25;
-  if (progress.videosWatched.length > 0) completion += 25;
+  if (isVideoSectionComplete(progress, coreVideoIds)) completion += 25;
   if (progress.algorithmRead) completion += 25;
   if ((progress.quizScore ?? 0) >= QUIZ_PASS_SCORE) completion += 25;
 
   return completion;
 }
 
-export function isTopicMastered(progress?: TopicProgressEntry | null): boolean {
-  return calculateTopicCompletion(progress) === 100;
+export function isTopicMastered(progress?: TopicProgressEntry | null, coreVideoIds: string[] = []): boolean {
+  return calculateTopicCompletion(progress, coreVideoIds) === 100;
 }
 
 export function formatLearningTime(totalSeconds: number): string {
@@ -95,17 +96,22 @@ interface UseProgressTrackerResult {
   timeSpent: number;
   milestoneMessage: string;
   currentStreak: number;
-  getCompletionPercentage: (slug: string) => number;
-  isMastered: (slug: string) => boolean;
+  getCompletionPercentage: (slug: string, coreVideoIds?: string[]) => number;
+  isMastered: (slug: string, coreVideoIds?: string[]) => boolean;
   markVisualizerViewed: () => void;
   markAlgorithmRead: () => void;
   markVideoWatched: (videoId: string) => void;
+  updateVideoProgress: (progress: VideoProgressEntry) => void;
   setQuizScore: (score: number) => void;
   markComplete: () => void;
   addPlaygroundSubmission: AppState["addPlaygroundSubmission"];
 }
 
-export function useProgressTracker(topicSlug?: string): UseProgressTrackerResult {
+interface UseProgressTrackerOptions {
+  coreVideoIds?: string[];
+}
+
+export function useProgressTracker(topicSlug?: string, options?: UseProgressTrackerOptions): UseProgressTrackerResult {
   const toast = useToast();
   const topicProgressMap = useStore((state) => state.topicProgress);
   const dailyStreak = useStore((state) => state.dailyStreak);
@@ -113,6 +119,7 @@ export function useProgressTracker(topicSlug?: string): UseProgressTrackerResult
   const storeMarkVisualizerViewed = useStore((state) => state.markVisualizerViewed);
   const storeMarkAlgorithmRead = useStore((state) => state.markAlgorithmRead);
   const storeMarkVideoWatched = useStore((state) => state.markVideoWatched);
+  const storeUpdateVideoProgress = useStore((state) => state.updateVideoProgress);
   const storeSetQuizScore = useStore((state) => state.setQuizScore);
   const storeMarkComplete = useStore((state) => state.markTopicComplete);
   const addTopicTime = useStore((state) => state.addTopicTime);
@@ -120,8 +127,12 @@ export function useProgressTracker(topicSlug?: string): UseProgressTrackerResult
   const addPlaygroundSubmission = useStore((state) => state.addPlaygroundSubmission);
 
   const topicProgress = topicSlug ? topicProgressMap[topicSlug] : undefined;
-  const completionPercentage = useMemo(() => calculateTopicCompletion(topicProgress), [topicProgress]);
-  const mastered = useMemo(() => isTopicMastered(topicProgress), [topicProgress]);
+  const coreVideoIds = useMemo(() => options?.coreVideoIds ?? [], [options?.coreVideoIds]);
+  const completionPercentage = useMemo(
+    () => calculateTopicCompletion(topicProgress, coreVideoIds),
+    [coreVideoIds, topicProgress]
+  );
+  const mastered = useMemo(() => isTopicMastered(topicProgress, coreVideoIds), [coreVideoIds, topicProgress]);
   const timeSpent = topicProgress?.timeSpent ?? 0;
   const milestoneMessage = useMemo(
     () => getMilestoneMessage(completionPercentage, mastered),
@@ -232,11 +243,14 @@ export function useProgressTracker(topicSlug?: string): UseProgressTrackerResult
   }, [completionPercentage, dailyStreak.currentStreak, mastered, toast, topicSlug]);
 
   const getCompletionPercentage = useCallback(
-    (slug: string) => calculateTopicCompletion(topicProgressMap[slug]),
+    (slug: string, selectedCoreVideoIds: string[] = []) => calculateTopicCompletion(topicProgressMap[slug], selectedCoreVideoIds),
     [topicProgressMap]
   );
 
-  const getMasteredState = useCallback((slug: string) => isTopicMastered(topicProgressMap[slug]), [topicProgressMap]);
+  const getMasteredState = useCallback(
+    (slug: string, selectedCoreVideoIds: string[] = []) => isTopicMastered(topicProgressMap[slug], selectedCoreVideoIds),
+    [topicProgressMap]
+  );
 
   const markVisualizerViewed = useCallback(() => {
     if (!topicSlug) return;
@@ -254,6 +268,14 @@ export function useProgressTracker(topicSlug?: string): UseProgressTrackerResult
       storeMarkVideoWatched(topicSlug, videoId);
     },
     [storeMarkVideoWatched, topicSlug]
+  );
+
+  const updateVideoProgress = useCallback(
+    (progress: VideoProgressEntry) => {
+      if (!topicSlug) return;
+      storeUpdateVideoProgress(topicSlug, progress);
+    },
+    [storeUpdateVideoProgress, topicSlug]
   );
 
   const setQuizScore = useCallback(
@@ -288,6 +310,7 @@ export function useProgressTracker(topicSlug?: string): UseProgressTrackerResult
     markVisualizerViewed,
     markAlgorithmRead,
     markVideoWatched,
+    updateVideoProgress,
     setQuizScore,
     markComplete,
     addPlaygroundSubmission,

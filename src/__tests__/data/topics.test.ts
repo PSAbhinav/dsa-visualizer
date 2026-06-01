@@ -53,4 +53,15 @@ describe('topics data', () => {
       });
     });
   });
+
+  it('marks exactly two core videos for every topic', () => {
+    topics.forEach((topic) => {
+      const coreVideos = topic.youtubeVideos.filter((video) => video.isCore);
+      expect(coreVideos).toHaveLength(2);
+      coreVideos.forEach((video) => {
+        expect(video.title).toBeTruthy();
+        expect(video.channel).toBeTruthy();
+      });
+    });
+  });
 });

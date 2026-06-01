@@ -32,6 +32,7 @@ export interface YouTubeVideo {
   title: string;
   channel: string;
   duration?: string;
+  isCore?: boolean;
 }
 
 export interface Topic {
@@ -47,6 +48,7 @@ export interface Topic {
   youtubeVideos: YouTubeVideo[];
   algorithms: Algorithm[];
   problems: Problem[];
+  prerequisites?: string[];
 }
 
 export interface QuizQuestion {
