@@ -16,7 +16,7 @@ interface LearningPathProps {
   levelFilter?: Level | "all";
 }
 
-type EdgeVisualState = "completed" | "active" | "locked";
+type EdgeVisualState = "completed" | "active" | "locked" | "recommended";
 
 type GraphPosition = {
   x: number;
@@ -153,6 +153,89 @@ function getCurrentLevel(nodes: LearningPathNode[]) {
   return levels[levels.length - 1]?.id ?? "beginner";
 }
 
+// Compute the recommended learning path - the optimal sequence of topics
+function computeRecommendedPath(
+  nodes: LearningPathNode[],
+  edges: LearningPathEdge[],
+  incoming: Map<string, string[]>,
+  outgoing: Map<string, string[]>
+): Set<string> {
+  const recommendedEdges = new Set<string>();
+  
+  // Find the starting point - first incomplete topic by level and recommendation rank
+  const sortedNodes = [...nodes].sort((a, b) => {
+    // Prioritize by level first
+    const levelDiff = (levelIndexLookup.get(a.topic.level) ?? 0) - (levelIndexLookup.get(b.topic.level) ?? 0);
+    if (levelDiff !== 0) return levelDiff;
+    
+    // Then by status (current/available first)
+    const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+    if (statusDiff !== 0) return statusDiff;
+    
+    // Then by recommendation rank
+    return (a.recommendationRank ?? 99) - (b.recommendationRank ?? 99);
+  });
+  
+  // Build the recommended path starting from completed topics through current/available
+  const visited = new Set<string>();
+  const pathNodes = new Set<string>();
+  
+  // Start with all completed nodes
+  nodes.filter(n => n.status === "completed").forEach(n => {
+    pathNodes.add(n.topic.slug);
+    visited.add(n.topic.slug);
+  });
+  
+  // Find current/available nodes and trace path to them
+  const activeNodes = sortedNodes.filter(n => n.status === "current" || n.status === "available");
+  
+  // For each active node, add it and find the best path forward
+  activeNodes.slice(0, 5).forEach(node => {
+    pathNodes.add(node.topic.slug);
+    
+    // Add edges from completed prerequisites to this node
+    const parents = incoming.get(node.topic.slug) ?? [];
+    parents.forEach(parent => {
+      const parentNode = nodes.find(n => n.topic.slug === parent);
+      if (parentNode && parentNode.status === "completed") {
+        recommendedEdges.add(`${parent}->${node.topic.slug}`);
+      }
+    });
+    
+    // Find the best next step from this node
+    const children = outgoing.get(node.topic.slug) ?? [];
+    const nextBest = children
+      .map(slug => nodes.find(n => n.topic.slug === slug))
+      .filter((n): n is LearningPathNode => !!n && n.status !== "completed")
+      .sort((a, b) => {
+        const levelDiff = (levelIndexLookup.get(a.topic.level) ?? 0) - (levelIndexLookup.get(b.topic.level) ?? 0);
+        if (levelDiff !== 0) return levelDiff;
+        return (a.recommendationRank ?? 99) - (b.recommendationRank ?? 99);
+      })[0];
+    
+    if (nextBest) {
+      recommendedEdges.add(`${node.topic.slug}->${nextBest.topic.slug}`);
+    }
+  });
+  
+  // Also highlight edges between completed nodes to show progress
+  edges.forEach(edge => {
+    const fromNode = nodes.find(n => n.topic.slug === edge.from);
+    const toNode = nodes.find(n => n.topic.slug === edge.to);
+    
+    if (fromNode?.status === "completed" && toNode?.status === "completed") {
+      // Check if this is on the main path (lowest level progression)
+      const fromLevel = levelIndexLookup.get(fromNode.topic.level) ?? 0;
+      const toLevel = levelIndexLookup.get(toNode.topic.level) ?? 0;
+      if (toLevel >= fromLevel) {
+        recommendedEdges.add(`${edge.from}->${edge.to}`);
+      }
+    }
+  });
+  
+  return recommendedEdges;
+}
+
 export default function LearningPath({
   nodes,
   edges,
@@ -212,6 +295,12 @@ export default function LearningPath({
   const resolvedSelectedSlug = selectedSlug && nodeMap.has(selectedSlug) ? selectedSlug : prioritySlug;
   const selectedNode = (resolvedSelectedSlug ? nodeMap.get(resolvedSelectedSlug) : null) ?? nodes[0] ?? null;
 
+  // Compute recommended path for highlighting
+  const recommendedPath = useMemo(
+    () => computeRecommendedPath(nodes, edges, dependencyMaps.incoming, dependencyMaps.outgoing),
+    [nodes, edges, dependencyMaps.incoming, dependencyMaps.outgoing]
+  );
+
   const selectedDependents = useMemo(() => {
     if (!selectedNode) {
       return [];
@@ -233,7 +322,7 @@ export default function LearningPath({
         cardHeight: preview ? 112 : 122,
         positions,
         levelBands: [] as Array<{ level: Level; x: number; width: number }>,
-        paths: [] as Array<LearningPathEdge & { path: string; visualState: EdgeVisualState }>,
+        paths: [] as Array<LearningPathEdge & { path: string; visualState: EdgeVisualState; edgeKey: string }>,
       };
     }
 
@@ -353,7 +442,7 @@ export default function LearningPath({
         return [];
       }
 
-      const visualState: EdgeVisualState = !edge.satisfied
+      const baseVisualState: EdgeVisualState = !edge.satisfied
         ? "locked"
         : targetNode.status === "completed"
           ? "completed"
@@ -366,7 +455,7 @@ export default function LearningPath({
       const curveStrength = Math.max(64, (endX - startX) * 0.38);
       const path = `M ${startX} ${startY} C ${startX + curveStrength} ${startY}, ${endX - curveStrength} ${endY}, ${endX} ${endY}`;
 
-      return [{ ...edge, path, visualState }];
+      return [{ ...edge, path, visualState: baseVisualState, edgeKey: `${edge.from}->${edge.to}` }];
     });
 
     const width = paddingLeft + paddingRight + orderedColumns.length * cardWidth + Math.max(0, orderedColumns.length - 1) * columnGap;
@@ -566,32 +655,49 @@ export default function LearningPath({
                   <TransformComponent wrapperClass="!h-full !w-full !cursor-grab active:!cursor-grabbing !pt-12" contentClass="!w-fit !h-fit">
                     <div className="relative" style={{ width: layout.width, height: layout.height }}>
                       <svg className="pointer-events-none absolute inset-0 overflow-visible" width={layout.width} height={layout.height}>
-                        {layout.paths.map((pathItem) => {
+                        {/* SVG Definitions for gradients and filters */}
+                        <defs>
+                          <linearGradient id="recommendedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="rgba(251,191,36,0.95)" />
+                            <stop offset="50%" stopColor="rgba(245,158,11,1)" />
+                            <stop offset="100%" stopColor="rgba(251,191,36,0.95)" />
+                          </linearGradient>
+                          <filter id="recommendedGlow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feMerge>
+                              <feMergeNode in="blur" />
+                              <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                          </filter>
+                        </defs>
+                        
+                        {/* Render non-recommended paths first (below) */}
+                        {layout.paths.filter(p => !recommendedPath.has(p.edgeKey)).map((pathItem) => {
                           const edgeStyle =
                             pathItem.visualState === "completed"
                               ? {
-                                  stroke: "rgba(52,211,153,0.95)",
-                                  glow: "rgba(52,211,153,0.24)",
-                                  strokeWidth: 3.8,
+                                  stroke: "rgba(52,211,153,0.7)",
+                                  glow: "rgba(52,211,153,0.15)",
+                                  strokeWidth: 2.5,
                                   dashArray: undefined,
                                 }
                               : pathItem.visualState === "active"
                                 ? {
-                                    stroke: "rgba(34,211,238,0.95)",
-                                    glow: "rgba(34,211,238,0.22)",
-                                    strokeWidth: 3.2,
-                                    dashArray: "12 12",
+                                    stroke: "rgba(34,211,238,0.6)",
+                                    glow: "rgba(34,211,238,0.12)",
+                                    strokeWidth: 2,
+                                    dashArray: "8 8",
                                   }
                                 : {
-                                    stroke: "rgba(148,163,184,0.35)",
-                                    glow: "rgba(148,163,184,0.06)",
-                                    strokeWidth: 2.4,
+                                    stroke: "rgba(148,163,184,0.25)",
+                                    glow: "rgba(148,163,184,0.04)",
+                                    strokeWidth: 1.8,
                                     dashArray: "4 10",
                                   };
 
                           return (
                             <g key={`${pathItem.from}-${pathItem.to}`}>
-                              <path d={pathItem.path} fill="none" stroke={edgeStyle.glow} strokeWidth={edgeStyle.strokeWidth + 6} strokeLinecap="round" />
+                              <path d={pathItem.path} fill="none" stroke={edgeStyle.glow} strokeWidth={edgeStyle.strokeWidth + 4} strokeLinecap="round" />
                               <motion.path
                                 d={pathItem.path}
                                 fill="none"
@@ -601,15 +707,70 @@ export default function LearningPath({
                                 strokeDasharray={edgeStyle.dashArray}
                                 animate={
                                   pathItem.visualState === "active"
-                                    ? { strokeDashoffset: [0, -48] }
+                                    ? { strokeDashoffset: [0, -32] }
                                     : { strokeDashoffset: 0 }
                                 }
                                 transition={
                                   pathItem.visualState === "active"
-                                    ? { duration: 1.6, repeat: Number.POSITIVE_INFINITY, ease: "linear" }
+                                    ? { duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }
                                     : { duration: 0 }
                                 }
                               />
+                            </g>
+                          );
+                        })}
+                        
+                        {/* Render recommended path on top with golden highlight */}
+                        {layout.paths.filter(p => recommendedPath.has(p.edgeKey)).map((pathItem) => {
+                          return (
+                            <g key={`recommended-${pathItem.from}-${pathItem.to}`}>
+                              {/* Outer glow */}
+                              <path 
+                                d={pathItem.path} 
+                                fill="none" 
+                                stroke="rgba(251,191,36,0.3)" 
+                                strokeWidth={16} 
+                                strokeLinecap="round"
+                              />
+                              {/* Inner glow */}
+                              <path 
+                                d={pathItem.path} 
+                                fill="none" 
+                                stroke="rgba(251,191,36,0.5)" 
+                                strokeWidth={10} 
+                                strokeLinecap="round"
+                              />
+                              {/* Main path with gradient */}
+                              <motion.path
+                                d={pathItem.path}
+                                fill="none"
+                                stroke="url(#recommendedGradient)"
+                                strokeWidth={4.5}
+                                strokeLinecap="round"
+                                filter="url(#recommendedGlow)"
+                              />
+                              {/* Animated particles along the path */}
+                              <motion.circle
+                                r={5}
+                                fill="rgba(251,191,36,1)"
+                                filter="url(#recommendedGlow)"
+                              >
+                                <animateMotion
+                                  dur="2.5s"
+                                  repeatCount="indefinite"
+                                  path={pathItem.path}
+                                />
+                              </motion.circle>
+                              <motion.circle
+                                r={3}
+                                fill="rgba(255,255,255,0.9)"
+                              >
+                                <animateMotion
+                                  dur="2.5s"
+                                  repeatCount="indefinite"
+                                  path={pathItem.path}
+                                />
+                              </motion.circle>
                             </g>
                           );
                         })}
@@ -713,13 +874,25 @@ export default function LearningPath({
                       </div>
                       <div className="relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/80" style={{ width: minimapMetrics.width, height: minimapMetrics.height }}>
                         <svg className="absolute inset-0" width={minimapMetrics.width} height={minimapMetrics.height}>
-                          {layout.paths.map((pathItem) => (
+                          {/* Non-recommended paths */}
+                          {layout.paths.filter(p => !recommendedPath.has(p.edgeKey)).map((pathItem) => (
                             <path
                               key={`mini-${pathItem.from}-${pathItem.to}`}
                               d={pathItem.path}
                               fill="none"
-                              stroke={pathItem.visualState === "completed" ? "rgba(52,211,153,0.75)" : pathItem.visualState === "active" ? "rgba(34,211,238,0.75)" : "rgba(148,163,184,0.3)"}
-                              strokeWidth={1.2}
+                              stroke={pathItem.visualState === "completed" ? "rgba(52,211,153,0.5)" : pathItem.visualState === "active" ? "rgba(34,211,238,0.5)" : "rgba(148,163,184,0.2)"}
+                              strokeWidth={0.8}
+                              transform={`scale(${minimapMetrics.scale})`}
+                            />
+                          ))}
+                          {/* Recommended paths highlighted */}
+                          {layout.paths.filter(p => recommendedPath.has(p.edgeKey)).map((pathItem) => (
+                            <path
+                              key={`mini-recommended-${pathItem.from}-${pathItem.to}`}
+                              d={pathItem.path}
+                              fill="none"
+                              stroke="rgba(251,191,36,0.9)"
+                              strokeWidth={2}
                               transform={`scale(${minimapMetrics.scale})`}
                             />
                           ))}
@@ -768,8 +941,18 @@ export default function LearningPath({
                     </div>
                   ) : null}
 
-                  <div className="pointer-events-none absolute bottom-4 left-4 rounded-full border border-white/10 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 backdrop-blur-xl">
-                    Scroll to zoom · drag to pan · pinch on touch
+                  {/* Recommended path legend */}
+                  <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-4">
+                    <div className="flex items-center gap-2 rounded-full border border-amber-400/30 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] backdrop-blur-xl">
+                      <div className="relative h-3 w-6">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 opacity-80" />
+                        <div className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 animate-pulse rounded-full bg-white" />
+                      </div>
+                      <span className="text-amber-300">Best path</span>
+                    </div>
+                    <div className="rounded-full border border-white/10 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 backdrop-blur-xl">
+                      Scroll to zoom · drag to pan
+                    </div>
                   </div>
                 </div>
 
