@@ -90,6 +90,7 @@ export function YouTubeEmbed({
   const { currentlyPlayingId, setCurrentlyPlaying } = useVideoPlayer();
   
   const [isPlaying, setIsPlaying] = useState(false);
+  const [pausedReason, setPausedReason] = useState<"user" | "inactivity" | null>(null);
   const [watchMetrics, setWatchMetrics] = useState(() => ({
     watchedPercentage: progress?.watchedPercentage ?? 0,
     playbackSpeed: progress?.playbackSpeed ?? 1,
@@ -112,13 +113,14 @@ export function YouTubeEmbed({
     [normalizedVideoId, video.id]
   );
 
-  // Build embed URL with resume position - ONLY use initial position to prevent flickering
+  // Build embed URL with resume position - use accumulated seconds for resume
   const embedUrl = useMemo(() => {
     if (!normalizedVideoId) return null;
-    const startTime = initialResumePositionRef.current;
+    // Use current accumulated position for resume after inactivity pause
+    const startTime = Math.floor(accumulatedSecondsRef.current);
     const startParam = startTime > 5 ? `&start=${startTime - 2}` : '';
     return `https://www.youtube.com/embed/${normalizedVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1${startParam}`;
-  }, [normalizedVideoId]); // Only depends on videoId, not on changing position
+  }, [normalizedVideoId, isPlaying]); // Recalculate when play state changes for proper resume
 
   const youtubeUrl = useMemo(
     () => `https://www.youtube.com/watch?v=${normalizedVideoId ?? video.id}`,
@@ -129,8 +131,19 @@ export function YouTubeEmbed({
   useEffect(() => {
     if (currentlyPlayingId && currentlyPlayingId !== instanceIdRef.current && isPlaying) {
       setIsPlaying(false);
+      setPausedReason("user");
     }
   }, [currentlyPlayingId, isPlaying]);
+
+  // AUTO-PAUSE: Stop video when page becomes inactive (tab switch, minimize, etc.)
+  useEffect(() => {
+    if (!isPageVisible && isPlaying) {
+      // Auto-pause the video by removing the iframe
+      setIsPlaying(false);
+      setPausedReason("inactivity");
+      lastTickRef.current = null;
+    }
+  }, [isPageVisible, isPlaying]);
 
   // Progress tracking - ONLY counts when page is visible
   useEffect(() => {
@@ -196,18 +209,21 @@ export function YouTubeEmbed({
   const handlePlay = useCallback(() => {
     if (!normalizedVideoId) return;
     setIsPlaying(true);
+    setPausedReason(null);
     setCurrentlyPlaying(instanceIdRef.current);
     onPlay?.(video);
   }, [normalizedVideoId, setCurrentlyPlaying, onPlay, video]);
 
   const handleStop = useCallback(() => {
     setIsPlaying(false);
+    setPausedReason("user");
     lastTickRef.current = null;
   }, []);
 
   const displayWatchedPercentage = Math.max(watchMetrics.watchedPercentage, progress?.watchedPercentage ?? 0);
   const completionState = watched || isVideoProgressComplete(progress) || Boolean(progress?.completedAt ?? watchMetrics.completedAt);
-  const resumePosition = Math.floor(progress?.lastWatchedPosition ?? watchMetrics.lastWatchedPosition ?? 0);
+  const resumePosition = Math.floor(accumulatedSecondsRef.current);
+  const wasAutoPaused = pausedReason === "inactivity";
 
   return (
     <motion.article
@@ -254,15 +270,25 @@ export function YouTubeEmbed({
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
               
+              {/* Auto-pause notification banner */}
+              {wasAutoPaused && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
+                  <div className="rounded-xl bg-amber-500/95 px-4 py-2 text-sm font-semibold text-black backdrop-blur shadow-lg">
+                    ⏸️ Video paused (tab was inactive)
+                  </div>
+                  <div className="text-white/90 text-xs">Click to resume</div>
+                </div>
+              )}
+              
               {/* Play button */}
-              <div className="absolute flex h-16 w-16 items-center justify-center rounded-full bg-red-600 shadow-lg transition-transform group-hover:scale-110">
+              <div className={`absolute flex h-16 w-16 items-center justify-center rounded-full shadow-lg transition-transform group-hover:scale-110 ${wasAutoPaused ? 'bg-amber-500' : 'bg-red-600'}`}>
                 <svg className="h-7 w-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
 
               {/* Resume indicator */}
-              {resumePosition > 10 && !completionState && (
+              {resumePosition > 10 && !completionState && !wasAutoPaused && (
                 <div className="absolute bottom-16 left-1/2 -translate-x-1/2 rounded-full bg-purple-600/90 px-4 py-2 text-xs font-medium text-white backdrop-blur">
                   Resume from {formatTime(resumePosition)}
                 </div>
