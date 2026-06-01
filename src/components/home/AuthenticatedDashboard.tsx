@@ -494,8 +494,8 @@ export default function AuthenticatedDashboard({ user }: AuthenticatedDashboardP
           </div>
         </motion.section>
 
-        <motion.section custom={3} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)]">
-          <div className={`p-2 ${glassCardClass}`}>
+        <motion.section custom={3} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 grid gap-6 lg:grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+          <div className={`min-h-[420px] p-2 ${glassCardClass}`}>
             <LearningPath
               nodes={learningPathPreview.nodes}
               edges={learningPathPreview.edges}
@@ -505,7 +505,7 @@ export default function AuthenticatedDashboard({ user }: AuthenticatedDashboardP
             />
           </div>
 
-          <div className={`p-6 ${glassCardClass}`}>
+          <div className={`h-fit self-start p-6 ${glassCardClass}`}>
             <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Learning path mini-view</p>
             <h2 className="mt-2 text-2xl font-semibold text-white">See your place on the roadmap</h2>
             <p className="mt-4 text-sm leading-7 text-slate-300">

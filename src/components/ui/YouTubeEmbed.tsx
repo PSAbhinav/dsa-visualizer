@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { YouTubeVideo } from "@/data/types";
 import {
@@ -235,34 +235,35 @@ export function YouTubeEmbed({
       className="group overflow-hidden rounded-[1.8rem] border border-white/10 bg-slate-950/70 shadow-[0_20px_70px_-30px_rgba(168,85,247,0.55)] backdrop-blur-xl"
     >
       <div className="relative aspect-video overflow-hidden border-b border-white/10 bg-slate-900">
-        <AnimatePresence mode="wait">
-          {isPlaying && embedUrl ? (
-            <motion.div
-              key="iframe"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0"
-            >
-              <iframe
-                ref={iframeRef}
-                src={embedUrl}
-                title={video.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="h-full w-full"
-              />
-            </motion.div>
-          ) : (
-            <motion.button
-              key="thumbnail"
-              type="button"
-              onClick={handlePlay}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
+        {/* Immediately remove iframe when not playing - no animation to prevent audio continuing */}
+        {isPlaying && embedUrl && (
+          <motion.div
+            key="iframe"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0"
+          >
+            <iframe
+              ref={iframeRef}
+              src={embedUrl}
+              title={video.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="h-full w-full"
+            />
+          </motion.div>
+        )}
+        
+        {/* Thumbnail shown when not playing */}
+        {!isPlaying && (
+          <motion.button
+            key="thumbnail"
+            type="button"
+            onClick={handlePlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 flex items-center justify-center"
+          >
               <img
                 src={thumbnailUrl}
                 alt={video.title}
@@ -312,14 +313,6 @@ export function YouTubeEmbed({
               )}
             </motion.button>
           )}
-        </AnimatePresence>
-
-        {/* Visibility warning */}
-        {isPlaying && !isPageVisible && (
-          <div className="absolute left-3 top-3 z-10 rounded-xl bg-amber-500/90 px-3 py-2 text-xs font-semibold text-black backdrop-blur">
-            ⏸ Progress paused (tab not active)
-          </div>
-        )}
 
         {/* Progress bar */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800">
