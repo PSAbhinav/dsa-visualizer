@@ -416,13 +416,13 @@ export default function LearningPath({
 
           <TransformWrapper
             initialScale={initialScale}
-            minScale={preview ? 0.42 : 0.48}
-            maxScale={preview ? 1.55 : 2.2}
+            minScale={preview ? 0.6 : 0.7}
+            maxScale={preview ? 1.5 : 1.8}
             centerOnInit
-            limitToBounds={false}
+            limitToBounds
             doubleClick={{ disabled: true }}
-            wheel={{ step: 0.14 }}
-            pinch={{ step: 5 }}
+            wheel={{ step: 0.05, smoothStep: 0.004 }}
+            pinch={{ step: 3 }}
             panning={{ velocityDisabled: true }}
             onTransform={(_ref, state) =>
               setTransformState({
@@ -504,33 +504,26 @@ export default function LearningPath({
                     preview ? "h-[440px]" : "h-[660px]",
                   )}
                 >
+                  {/* Fixed level headers - outside transform */}
+                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex gap-2 p-3">
+                    {levels
+                      .filter((level) => levelFilter === "all" || level.id === levelFilter)
+                      .map((level) => (
+                        <div
+                          key={level.id}
+                          className="flex-1 rounded-2xl border border-white/10 bg-slate-950/95 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 shadow-lg backdrop-blur-xl"
+                        >
+                          <span className="mr-2">{level.icon}</span>
+                          {level.title}
+                        </div>
+                      ))}
+                  </div>
+
                   <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:32px_32px]" />
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.08),transparent_42%),radial-gradient(circle_at_85%_15%,rgba(168,85,247,0.12),transparent_22%)]" />
 
-                  <TransformComponent wrapperClass="!h-full !w-full !cursor-grab active:!cursor-grabbing" contentClass="!w-fit !h-fit">
+                  <TransformComponent wrapperClass="!h-full !w-full !cursor-grab active:!cursor-grabbing !pt-14" contentClass="!w-fit !h-fit">
                     <div className="relative" style={{ width: layout.width, height: layout.height }}>
-                      {layout.levelBands.map((band) => {
-                        const level = levels.find((item) => item.id === band.level);
-                        if (!level) {
-                          return null;
-                        }
-
-                        return (
-                          <div
-                            key={band.level}
-                            className="absolute top-6 z-10 rounded-full border border-white/10 bg-slate-950/85 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-200 shadow-[0_18px_40px_-28px_rgba(34,211,238,0.6)] backdrop-blur"
-                            style={{ left: band.x, width: band.width }}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span>
-                                {level.icon} {level.title}
-                              </span>
-                              <span className="text-[10px] text-slate-400">{level.description}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-
                       <svg className="pointer-events-none absolute inset-0 overflow-visible" width={layout.width} height={layout.height}>
                         {layout.paths.map((pathItem) => {
                           const edgeStyle =
