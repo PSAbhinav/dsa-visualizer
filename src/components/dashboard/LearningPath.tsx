@@ -421,7 +421,7 @@ export default function LearningPath({
             centerOnInit
             limitToBounds
             doubleClick={{ disabled: true }}
-            wheel={{ step: 0.05, smoothStep: 0.004 }}
+            wheel={{ step: 0.05 }}
             pinch={{ step: 3 }}
             panning={{ velocityDisabled: true }}
             onTransform={(_ref, state) =>
