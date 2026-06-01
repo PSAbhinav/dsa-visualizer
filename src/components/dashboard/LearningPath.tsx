@@ -543,13 +543,13 @@ export default function LearningPath({
 
           <TransformWrapper
             initialScale={initialScale}
-            minScale={preview ? 0.25 : 0.3}
-            maxScale={preview ? 2.5 : 3.0}
+            minScale={preview ? 0.35 : 0.4}
+            maxScale={preview ? 2.0 : 2.5}
             centerOnInit
             limitToBounds={false}
             doubleClick={{ disabled: true }}
-            wheel={{ step: 0.08 }}
-            pinch={{ step: 5 }}
+            wheel={{ step: 0.005 }}
+            pinch={{ step: 0.5 }}
             panning={{ velocityDisabled: true }}
             onTransform={(_ref, state) =>
               setTransformState({
