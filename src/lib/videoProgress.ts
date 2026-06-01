@@ -8,6 +8,8 @@ export interface VideoProgressEntry {
   watchedPercentage: number;
   playbackSpeed: number;
   completedAt?: string;
+  lastWatchedPosition?: number; // in seconds - where user left off
+  videoDuration?: number; // total duration in seconds
 }
 
 interface TopicVideoProgressShape {
@@ -31,6 +33,12 @@ export function sanitizeVideoProgressEntry(
     100
   );
   const playbackSpeed = Number.isFinite(entry.playbackSpeed) ? Number(entry.playbackSpeed) : previous?.playbackSpeed ?? 1;
+  const lastWatchedPosition = Number.isFinite(entry.lastWatchedPosition) 
+    ? Math.max(entry.lastWatchedPosition!, previous?.lastWatchedPosition ?? 0)
+    : previous?.lastWatchedPosition;
+  const videoDuration = Number.isFinite(entry.videoDuration) 
+    ? entry.videoDuration 
+    : previous?.videoDuration;
   const completedAt =
     previous?.completedAt ??
     entry.completedAt ??
@@ -43,6 +51,8 @@ export function sanitizeVideoProgressEntry(
     watchedPercentage: Math.round(watchedPercentage),
     playbackSpeed: Number(playbackSpeed.toFixed(2)),
     completedAt,
+    lastWatchedPosition,
+    videoDuration,
   };
 }
 
