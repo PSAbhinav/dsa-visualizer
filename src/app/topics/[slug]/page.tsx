@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { getQuizByTopicSlug } from "@/data/quizzes";
 import { getTopicBySlug } from "@/data/topics";
@@ -149,14 +149,16 @@ export default function TopicDetailPage() {
       return 0;
     }
   });
-  const topicQuizAttempts = useStore((state) => {
+  // Get quizHistory once, then memoize filtering to prevent infinite re-renders
+  const quizHistory = useStore((state) => state.quizHistory ?? []);
+  const topicQuizAttempts = useMemo(() => {
     if (!topic?.slug) return [];
     try {
-      return state.quizHistory?.filter?.((attempt) => attempt.topicSlug === topic.slug) ?? [];
+      return quizHistory.filter((attempt) => attempt.topicSlug === topic.slug);
     } catch {
       return [];
     }
-  });
+  }, [quizHistory, topic?.slug]);
 
   const selectedAlgorithm = topic?.algorithms[selectedAlgoIndex] ?? topic?.algorithms[0];
   const availableImplementations = selectedAlgorithm?.code ?? [];
