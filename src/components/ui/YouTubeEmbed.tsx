@@ -45,28 +45,23 @@ function resolveYouTubeVideoId(value: string): string | null {
   }
 }
 
-// Hook to detect if page is visible
+// Hook to detect if page is visible (only use document.visibilityState, not focus)
+// We removed window focus/blur because clicking on iframe (YouTube controls) causes
+// the main document to lose focus, which incorrectly triggered pause
 function usePageVisibility() {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // Only consider tab switching (visibilityState), not focus loss
       setIsVisible(document.visibilityState === "visible");
     };
 
-    const handleFocus = () => setIsVisible(true);
-    const handleBlur = () => setIsVisible(false);
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("blur", handleBlur);
-
-    setIsVisible(document.visibilityState === "visible" && document.hasFocus());
+    setIsVisible(document.visibilityState === "visible");
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("blur", handleBlur);
     };
   }, []);
 
