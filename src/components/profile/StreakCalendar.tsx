@@ -113,7 +113,7 @@ export function StreakCalendar({ activityLog, topicTitlesBySlug }: StreakCalenda
             <div className="grid grid-flow-col gap-2">
               {weeks.map((week, weekIndex) => (
                 <div key={`week-${weekIndex}`} className="grid grid-rows-7 gap-2">
-                  {week.map((cell) => {
+                  {week.map((cell, dayIndex) => {
                     const intensity = intensityFromActivity(cell.activity?.timeSpent ?? 0, cell.activity?.activityCount ?? 0);
                     const topicsLearned = (cell.activity?.topicsLearned ?? []).map(
                       (slug) => topicTitlesBySlug[slug] ?? slug
@@ -121,6 +121,9 @@ export function StreakCalendar({ activityLog, topicTitlesBySlug }: StreakCalenda
                     const tooltip = topicsLearned.length > 0
                       ? `${topicsLearned.length} topic${topicsLearned.length === 1 ? "" : "s"}: ${topicsLearned.join(", ")}`
                       : "No activity recorded";
+
+                    // Show tooltip below for top rows (Sun/Mon/Tue) to avoid clipping
+                    const showBelow = dayIndex < 3;
 
                     return (
                       <motion.div
@@ -132,7 +135,7 @@ export function StreakCalendar({ activityLog, topicTitlesBySlug }: StreakCalenda
                           className={`h-3.5 w-3.5 rounded-[4px] border ${cellTone[intensity]}`}
                           aria-label={`${cell.date.toDateString()} — ${tooltip}`}
                         />
-                        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-52 -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-xs text-slate-200 shadow-2xl shadow-black/40 group-hover:block">
+                        <div className={`pointer-events-none absolute left-1/2 z-20 hidden w-52 -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-xs text-slate-200 shadow-2xl shadow-black/40 group-hover:block ${showBelow ? "top-full mt-2" : "bottom-full mb-2"}`}>
                           <p className="font-semibold text-white">
                             {cell.date.toLocaleDateString("en-US", {
                               month: "short",

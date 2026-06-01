@@ -266,7 +266,7 @@ export function ArrayVisualizer({ initialArray }: ArrayVisualizerProps) {
         </div>
       </div>
 
-      <div className="mb-4 grid gap-3 md:grid-cols-3">
+      <div className="mb-4 grid gap-3 lg:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-gray-900/50 p-3">
           <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-gray-500">Access</div>
           <div className="flex gap-2">
@@ -276,13 +276,13 @@ export function ArrayVisualizer({ initialArray }: ArrayVisualizerProps) {
               onChange={(event) => setAccessIndex(event.target.value)}
               placeholder="Index"
               disabled={isRunning}
-              className="w-full rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-sky-500 disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-sky-500 disabled:opacity-50"
             />
             <button
               type="button"
               onClick={() => void handleAccess()}
               disabled={isRunning}
-              className="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+              className="shrink-0 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
             >
               Read
             </button>
@@ -290,14 +290,14 @@ export function ArrayVisualizer({ initialArray }: ArrayVisualizerProps) {
         </div>
         <div className="rounded-xl border border-white/10 bg-gray-900/50 p-3">
           <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-gray-500">Insert</div>
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+          <div className="flex gap-2">
             <input
               type="number"
               value={insertIndex}
               onChange={(event) => setInsertIndex(event.target.value)}
               placeholder="Index"
               disabled={isRunning}
-              className="rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
             />
             <input
               type="number"
@@ -305,13 +305,13 @@ export function ArrayVisualizer({ initialArray }: ArrayVisualizerProps) {
               onChange={(event) => setInsertValue(event.target.value)}
               placeholder="Value"
               disabled={isRunning}
-              className="rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500 disabled:opacity-50"
             />
             <button
               type="button"
               onClick={handleInsert}
               disabled={isRunning}
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
             >
               Add
             </button>
@@ -326,13 +326,13 @@ export function ArrayVisualizer({ initialArray }: ArrayVisualizerProps) {
               onChange={(event) => setDeleteIndex(event.target.value)}
               placeholder="Index"
               disabled={isRunning}
-              className="w-full rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-rose-500 disabled:opacity-50"
+              className="min-w-0 flex-1 rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white outline-none focus:border-rose-500 disabled:opacity-50"
             />
             <button
               type="button"
               onClick={handleDelete}
               disabled={isRunning}
-              className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+              className="shrink-0 rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
             >
               Remove
             </button>
