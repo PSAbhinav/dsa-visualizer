@@ -249,7 +249,8 @@ export default function LearningPath({
 }: LearningPathProps) {
   const prioritySlug = useMemo(() => getPrioritySlug(nodes), [nodes]);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
-  const initialScale = preview ? 0.54 : 0.78;
+  // Lower initial scale to show more of the roadmap at once
+  const initialScale = preview ? 0.38 : 0.45;
   const [transformState, setTransformState] = useState<TransformViewportState>({
     scale: initialScale,
     positionX: 0,
@@ -322,22 +323,23 @@ export default function LearningPath({
       return {
         width: 0,
         height: 0,
-        cardWidth: preview ? 214 : 228,
-        cardHeight: preview ? 112 : 122,
+        cardWidth: preview ? 240 : 280,
+        cardHeight: preview ? 140 : 160,
         positions,
         levelBands: [] as Array<{ level: Level; x: number; width: number }>,
         paths: [] as Array<LearningPathEdge & { path: string; visualState: EdgeVisualState; edgeKey: string }>,
       };
     }
 
-    const cardWidth = preview ? 214 : 228;
-    const cardHeight = preview ? 112 : 122;
-    const columnGap = preview ? 82 : 108;
-    const rowGap = preview ? 28 : 34;
-    const paddingLeft = preview ? 28 : 60;
-    const paddingRight = preview ? 28 : 72;
-    const paddingTop = preview ? 86 : 118;
-    const paddingBottom = preview ? 44 : 64;
+    // Larger cards with more info
+    const cardWidth = preview ? 240 : 280;
+    const cardHeight = preview ? 140 : 160;
+    const columnGap = preview ? 100 : 130;
+    const rowGap = preview ? 36 : 44;
+    const paddingLeft = preview ? 40 : 80;
+    const paddingRight = preview ? 40 : 100;
+    const paddingTop = preview ? 100 : 140;
+    const paddingBottom = preview ? 60 : 80;
 
     const depthMemo = new Map<string, number>();
     const getDepth = (slug: string): number => {
@@ -541,13 +543,13 @@ export default function LearningPath({
 
           <TransformWrapper
             initialScale={initialScale}
-            minScale={preview ? 0.6 : 0.7}
-            maxScale={preview ? 1.5 : 1.8}
+            minScale={preview ? 0.25 : 0.3}
+            maxScale={preview ? 2.5 : 3.0}
             centerOnInit
-            limitToBounds
+            limitToBounds={false}
             doubleClick={{ disabled: true }}
-            wheel={{ step: 0.05 }}
-            pinch={{ step: 3 }}
+            wheel={{ step: 0.08 }}
+            pinch={{ step: 5 }}
             panning={{ velocityDisabled: true }}
             onTransform={(_ref, state) =>
               setTransformState({
@@ -590,8 +592,9 @@ export default function LearningPath({
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => zoomOut(0.18)}
+                      onClick={() => zoomOut(0.25)}
                       className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/30"
+                      title="Zoom out"
                     >
                       −
                     </button>
@@ -600,8 +603,9 @@ export default function LearningPath({
                     </div>
                     <button
                       type="button"
-                      onClick={() => zoomIn(0.18)}
+                      onClick={() => zoomIn(0.25)}
                       className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/30"
+                      title="Zoom in"
                     >
                       +
                     </button>
@@ -609,8 +613,9 @@ export default function LearningPath({
                       type="button"
                       onClick={() => resetTransform()}
                       className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200 transition hover:border-cyan-300/30 hover:text-white"
+                      title={`Reset to ${Math.round(initialScale * 100)}%`}
                     >
-                      Reset
+                      Fit All
                     </button>
                     <button
                       type="button"
@@ -801,45 +806,50 @@ export default function LearningPath({
                           >
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_40%)] opacity-60" />
                             {/* Level color accent at top - thicker */}
-                            <div className={clsx("absolute left-0 right-0 top-0 h-1.5 rounded-t-lg", levelStyle.accent, node.status === "locked" ? "opacity-30" : "opacity-90")} />
-                            <div className="relative flex h-full flex-col justify-between">
+                            <div className={clsx("absolute left-0 right-0 top-0 h-2 rounded-t-lg", levelStyle.accent, node.status === "locked" ? "opacity-30" : "opacity-90")} />
+                            <div className="relative flex h-full flex-col justify-between p-0.5">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/20 text-base shadow-inner shadow-black/30">
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/30 text-lg shadow-inner shadow-black/30">
                                       {node.topic.icon}
                                     </span>
                                     <div className="min-w-0 flex-1">
                                       {/* Level badge with color */}
-                                      <span className={clsx("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider", levelStyle.bg, levelStyle.text)}>
+                                      <span className={clsx("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", levelStyle.bg, levelStyle.text)}>
                                         {level?.icon} {level?.title}
                                       </span>
-                                      <h3 className="truncate text-sm font-semibold text-white">{node.topic.title}</h3>
+                                      <h3 className="truncate text-sm font-bold text-white">{node.topic.title}</h3>
                                     </div>
                                   </div>
-                                  <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-slate-300/90">{node.topic.shortDescription}</p>
+                                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-300">{node.topic.shortDescription}</p>
                                 </div>
-                                <span className={clsx("shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold", meta.badgeClass)}>
+                                <span className={clsx("shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold", meta.badgeClass)}>
                                   {meta.icon}
                                 </span>
                               </div>
 
-                              <div className="mt-2 space-y-2">
-                                <div className="flex items-center justify-between gap-2 text-[10px]">
+                              <div className="mt-auto space-y-2">
+                                <div className="flex items-center justify-between gap-2 text-[11px]">
                                   <span className={clsx("rounded-md border px-2 py-0.5 font-semibold", meta.badgeClass)}>
                                     {meta.label}
                                   </span>
-                                  <span className="rounded-md border border-white/10 bg-black/20 px-2 py-0.5 font-semibold text-slate-200">
-                                    {typeof node.quizScore === "number" ? `${node.quizScore}%` : "--"}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="rounded-md border border-white/10 bg-black/20 px-2 py-0.5 font-medium text-slate-300">
+                                      {node.topic.problems.length} problems
+                                    </span>
+                                    <span className="rounded-md border border-white/10 bg-black/20 px-2 py-0.5 font-semibold text-slate-200">
+                                      Quiz: {typeof node.quizScore === "number" ? `${node.quizScore}%` : "—"}
+                                    </span>
+                                  </div>
                                 </div>
 
                                 <div className="space-y-1">
-                                  <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                    <span>{node.completionPercentage}%</span>
-                                    <span>{node.topic.problems.length} problems</span>
+                                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                    <span className="font-medium">Progress</span>
+                                    <span className="font-semibold text-white">{node.completionPercentage}%</span>
                                   </div>
-                                  <div className="h-1 overflow-hidden rounded-full bg-white/10">
+                                  <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                                     <div
                                       className={clsx("h-full rounded-full bg-gradient-to-r", meta.progressClass)}
                                       style={{ width: `${node.completionPercentage}%` }}
