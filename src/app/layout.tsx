@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "../styles/responsive.css";
 import { Navbar } from "@/components/layout/Navbar";
@@ -99,6 +100,7 @@ export default function RootLayout({
             <PageTransition>{children}</PageTransition>
           </main>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
