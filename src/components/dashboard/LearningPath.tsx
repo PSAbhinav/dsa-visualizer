@@ -80,35 +80,39 @@ const statusMeta: Record<
   },
 };
 
-// Level-specific colors for clear visual differentiation
-const levelColors: Record<Level, { border: string; bg: string; text: string; accent: string; glow: string }> = {
+// Level-specific colors for clear visual differentiation - VIBRANT colors
+const levelColors: Record<Level, { border: string; bg: string; text: string; accent: string; glow: string; card: string }> = {
   beginner: {
     border: "border-l-emerald-400",
-    bg: "bg-emerald-500/10",
+    bg: "bg-emerald-500/20",
     text: "text-emerald-300",
     accent: "bg-emerald-400",
-    glow: "shadow-emerald-500/20",
+    glow: "shadow-[0_0_20px_rgba(52,211,153,0.4)]",
+    card: "bg-gradient-to-br from-emerald-900/40 to-emerald-950/60 border-emerald-500/40",
   },
   intermediate: {
     border: "border-l-blue-400",
-    bg: "bg-blue-500/10",
+    bg: "bg-blue-500/20",
     text: "text-blue-300",
     accent: "bg-blue-400",
-    glow: "shadow-blue-500/20",
+    glow: "shadow-[0_0_20px_rgba(59,130,246,0.4)]",
+    card: "bg-gradient-to-br from-blue-900/40 to-blue-950/60 border-blue-500/40",
   },
   advanced: {
     border: "border-l-purple-400",
-    bg: "bg-purple-500/10",
+    bg: "bg-purple-500/20",
     text: "text-purple-300",
     accent: "bg-purple-400",
-    glow: "shadow-purple-500/20",
+    glow: "shadow-[0_0_20px_rgba(168,85,247,0.4)]",
+    card: "bg-gradient-to-br from-purple-900/40 to-purple-950/60 border-purple-500/40",
   },
   pro: {
-    border: "border-l-amber-400",
-    bg: "bg-amber-500/10",
-    text: "text-amber-300",
-    accent: "bg-amber-400",
-    glow: "shadow-amber-500/20",
+    border: "border-l-orange-400",
+    bg: "bg-orange-500/20",
+    text: "text-orange-300",
+    accent: "bg-orange-400",
+    glow: "shadow-[0_0_20px_rgba(251,146,60,0.4)]",
+    card: "bg-gradient-to-br from-orange-900/40 to-orange-950/60 border-orange-500/40",
   },
 };
 
@@ -506,9 +510,9 @@ export default function LearningPath({
   }
 
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.1),transparent_22%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_26%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-5 text-white shadow-[0_30px_120px_-52px_rgba(34,211,238,0.42)] backdrop-blur-2xl sm:p-6 lg:p-7">
+    <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.1),transparent_22%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_26%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-5 text-white shadow-[0_30px_120px_-52px_rgba(34,211,238,0.42)] backdrop-blur-2xl sm:p-6 lg:p-7">
       <div className={clsx("grid gap-6", preview ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]")}>
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-hidden">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.34em] text-cyan-300">Interactive roadmap</p>
@@ -626,7 +630,7 @@ export default function LearningPath({
                   )}
                 >
                   {/* Fixed level legend - shows which colors mean which level */}
-                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex items-center justify-center gap-3 p-2.5">
+                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex items-center justify-end gap-2 p-3">
                     {levels
                       .filter((level) => levelFilter === "all" || level.id === levelFilter)
                       .map((level) => {
@@ -635,13 +639,16 @@ export default function LearningPath({
                           <div
                             key={level.id}
                             className={clsx(
-                              "flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider shadow-lg backdrop-blur-xl",
+                              "flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider backdrop-blur-xl",
                               colors.bg,
                               colors.text,
-                              "border-white/10"
+                              level.id === "beginner" && "border-emerald-400/60",
+                              level.id === "intermediate" && "border-blue-400/60",
+                              level.id === "advanced" && "border-purple-400/60",
+                              level.id === "pro" && "border-orange-400/60",
                             )}
                           >
-                            <div className={clsx("h-2.5 w-2.5 rounded-full", colors.accent)} />
+                            <div className={clsx("h-3 w-3 rounded-full", colors.accent)} />
                             <span>{level.icon}</span>
                             <span>{level.title}</span>
                           </div>
@@ -778,10 +785,12 @@ export default function LearningPath({
                             onClick={() => setSelectedSlug(node.topic.slug)}
                             className={clsx(
                               "absolute overflow-hidden rounded-[1.45rem] border-l-4 border p-3 text-left transition duration-200",
-                              meta.cardClass,
+                              levelStyle.card,
                               levelStyle.border,
+                              levelStyle.glow,
                               isSelected && "ring-2 ring-cyan-300/70 ring-offset-2 ring-offset-slate-950",
-                              node.status === "locked" ? "opacity-55 saturate-[0.3]" : "opacity-100",
+                              node.status === "locked" ? "opacity-50 saturate-[0.2]" : "opacity-100",
+                              node.status === "completed" && "border-emerald-400/50",
                             )}
                             style={{
                               left: position.x,
@@ -790,9 +799,9 @@ export default function LearningPath({
                               height: layout.cardHeight,
                             }}
                           >
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_34%)] opacity-70" />
-                            {/* Level color accent at top */}
-                            <div className={clsx("absolute left-0 right-0 top-0 h-1", levelStyle.accent, node.status === "locked" ? "opacity-30" : "opacity-80")} />
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.12),transparent_40%)] opacity-60" />
+                            {/* Level color accent at top - thicker */}
+                            <div className={clsx("absolute left-0 right-0 top-0 h-1.5 rounded-t-lg", levelStyle.accent, node.status === "locked" ? "opacity-30" : "opacity-90")} />
                             <div className="relative flex h-full flex-col justify-between">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
@@ -882,27 +891,27 @@ export default function LearningPath({
                             return null;
                           }
 
-                          // Use level-based colors for minimap nodes
+                          // Use level-based colors for minimap nodes - more vibrant
                           const levelColorMap: Record<Level, string> = {
                             beginner: "bg-emerald-400",
                             intermediate: "bg-blue-400",
                             advanced: "bg-purple-400",
-                            pro: "bg-amber-400",
+                            pro: "bg-orange-400",
                           };
 
                           return (
                             <div
                               key={`mini-node-${node.topic.slug}`}
                               className={clsx(
-                                "absolute rounded",
+                                "absolute rounded-sm",
                                 levelColorMap[node.topic.level],
                               )}
                               style={{
                                 left: position.x * minimapMetrics.scale,
                                 top: position.y * minimapMetrics.scale,
-                                width: Math.max(layout.cardWidth * minimapMetrics.scale, 4),
-                                height: Math.max(layout.cardHeight * minimapMetrics.scale, 4),
-                                opacity: node.status === "locked" ? 0.35 : node.status === "completed" ? 1 : 0.75,
+                                width: Math.max(layout.cardWidth * minimapMetrics.scale, 5),
+                                height: Math.max(layout.cardHeight * minimapMetrics.scale, 5),
+                                opacity: node.status === "locked" ? 0.3 : node.status === "completed" ? 1 : 0.85,
                               }}
                             />
                           );
