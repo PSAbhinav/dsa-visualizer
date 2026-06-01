@@ -80,6 +80,38 @@ const statusMeta: Record<
   },
 };
 
+// Level-specific colors for clear visual differentiation
+const levelColors: Record<Level, { border: string; bg: string; text: string; accent: string; glow: string }> = {
+  beginner: {
+    border: "border-l-emerald-400",
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-300",
+    accent: "bg-emerald-400",
+    glow: "shadow-emerald-500/20",
+  },
+  intermediate: {
+    border: "border-l-blue-400",
+    bg: "bg-blue-500/10",
+    text: "text-blue-300",
+    accent: "bg-blue-400",
+    glow: "shadow-blue-500/20",
+  },
+  advanced: {
+    border: "border-l-purple-400",
+    bg: "bg-purple-500/10",
+    text: "text-purple-300",
+    accent: "bg-purple-400",
+    glow: "shadow-purple-500/20",
+  },
+  pro: {
+    border: "border-l-amber-400",
+    bg: "bg-amber-500/10",
+    text: "text-amber-300",
+    accent: "bg-amber-400",
+    glow: "shadow-amber-500/20",
+  },
+};
+
 const levelIndexLookup = new Map(levels.map((level, index) => [level.id, index]));
 const statusOrder: Record<LearningPathStatus, number> = {
   current: 0,
@@ -504,25 +536,34 @@ export default function LearningPath({
                     preview ? "h-[440px]" : "h-[660px]",
                   )}
                 >
-                  {/* Fixed level headers - outside transform */}
-                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex gap-2 p-3">
+                  {/* Fixed level legend - shows which colors mean which level */}
+                  <div className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex items-center justify-center gap-3 p-2.5">
                     {levels
                       .filter((level) => levelFilter === "all" || level.id === levelFilter)
-                      .map((level) => (
-                        <div
-                          key={level.id}
-                          className="flex-1 rounded-2xl border border-white/10 bg-slate-950/95 px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-200 shadow-lg backdrop-blur-xl"
-                        >
-                          <span className="mr-2">{level.icon}</span>
-                          {level.title}
-                        </div>
-                      ))}
+                      .map((level) => {
+                        const colors = levelColors[level.id];
+                        return (
+                          <div
+                            key={level.id}
+                            className={clsx(
+                              "flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider shadow-lg backdrop-blur-xl",
+                              colors.bg,
+                              colors.text,
+                              "border-white/10"
+                            )}
+                          >
+                            <div className={clsx("h-2.5 w-2.5 rounded-full", colors.accent)} />
+                            <span>{level.icon}</span>
+                            <span>{level.title}</span>
+                          </div>
+                        );
+                      })}
                   </div>
 
                   <div className="pointer-events-none absolute inset-0 opacity-70 [background-image:linear-gradient(rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] [background-size:32px_32px]" />
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.08),transparent_42%),radial-gradient(circle_at_85%_15%,rgba(168,85,247,0.12),transparent_22%)]" />
 
-                  <TransformComponent wrapperClass="!h-full !w-full !cursor-grab active:!cursor-grabbing !pt-14" contentClass="!w-fit !h-fit">
+                  <TransformComponent wrapperClass="!h-full !w-full !cursor-grab active:!cursor-grabbing !pt-12" contentClass="!w-fit !h-fit">
                     <div className="relative" style={{ width: layout.width, height: layout.height }}>
                       <svg className="pointer-events-none absolute inset-0 overflow-visible" width={layout.width} height={layout.height}>
                         {layout.paths.map((pathItem) => {
@@ -583,6 +624,7 @@ export default function LearningPath({
                         const isSelected = selectedNode?.topic.slug === node.topic.slug;
                         const meta = statusMeta[node.status];
                         const level = levels.find((item) => item.id === node.topic.level);
+                        const levelStyle = levelColors[node.topic.level];
 
                         return (
                           <motion.button
@@ -595,10 +637,11 @@ export default function LearningPath({
                             whileHover={node.status === "locked" ? undefined : { scale: 1.03, y: -2 }}
                             onClick={() => setSelectedSlug(node.topic.slug)}
                             className={clsx(
-                              "absolute overflow-hidden rounded-[1.45rem] border p-3 text-left transition duration-200",
+                              "absolute overflow-hidden rounded-[1.45rem] border-l-4 border p-3 text-left transition duration-200",
                               meta.cardClass,
+                              levelStyle.border,
                               isSelected && "ring-2 ring-cyan-300/70 ring-offset-2 ring-offset-slate-950",
-                              node.status === "locked" ? "opacity-55 saturate-0" : "opacity-100",
+                              node.status === "locked" ? "opacity-55 saturate-[0.3]" : "opacity-100",
                             )}
                             style={{
                               left: position.x,
@@ -608,43 +651,46 @@ export default function LearningPath({
                             }}
                           >
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_34%)] opacity-70" />
+                            {/* Level color accent at top */}
+                            <div className={clsx("absolute left-0 right-0 top-0 h-1", levelStyle.accent, node.status === "locked" ? "opacity-30" : "opacity-80")} />
                             <div className="relative flex h-full flex-col justify-between">
-                              <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-lg shadow-inner shadow-black/30">
+                                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/20 text-base shadow-inner shadow-black/30">
                                       {node.topic.icon}
                                     </span>
-                                    <div className="min-w-0">
-                                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-300/80">
+                                    <div className="min-w-0 flex-1">
+                                      {/* Level badge with color */}
+                                      <span className={clsx("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider", levelStyle.bg, levelStyle.text)}>
                                         {level?.icon} {level?.title}
-                                      </p>
+                                      </span>
                                       <h3 className="truncate text-sm font-semibold text-white">{node.topic.title}</h3>
                                     </div>
                                   </div>
-                                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300/90">{node.topic.shortDescription}</p>
+                                  <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-slate-300/90">{node.topic.shortDescription}</p>
                                 </div>
-                                <span className={clsx("rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]", meta.badgeClass)}>
+                                <span className={clsx("shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold", meta.badgeClass)}>
                                   {meta.icon}
                                 </span>
                               </div>
 
-                              <div className="mt-3 space-y-3">
-                                <div className="flex items-center justify-between gap-2 text-[11px]">
-                                  <span className={clsx("rounded-full border px-2.5 py-1 font-semibold", meta.badgeClass)}>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center justify-between gap-2 text-[10px]">
+                                  <span className={clsx("rounded-md border px-2 py-0.5 font-semibold", meta.badgeClass)}>
                                     {meta.label}
                                   </span>
-                                  <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 font-semibold text-slate-200">
-                                    {typeof node.quizScore === "number" ? `Quiz ${node.quizScore}%` : "Quiz --"}
+                                  <span className="rounded-md border border-white/10 bg-black/20 px-2 py-0.5 font-semibold text-slate-200">
+                                    {typeof node.quizScore === "number" ? `${node.quizScore}%` : "--"}
                                   </span>
                                 </div>
 
-                                <div className="space-y-1.5">
-                                  <div className="flex items-center justify-between text-[11px] text-slate-300">
-                                    <span>{node.completionPercentage}% progress</span>
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                    <span>{node.completionPercentage}%</span>
                                     <span>{node.topic.problems.length} problems</span>
                                   </div>
-                                  <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                                  <div className="h-1 overflow-hidden rounded-full bg-white/10">
                                     <div
                                       className={clsx("h-full rounded-full bg-gradient-to-r", meta.progressClass)}
                                       style={{ width: `${node.completionPercentage}%` }}
@@ -684,23 +730,27 @@ export default function LearningPath({
                             return null;
                           }
 
+                          // Use level-based colors for minimap nodes
+                          const levelColorMap: Record<Level, string> = {
+                            beginner: "bg-emerald-400",
+                            intermediate: "bg-blue-400",
+                            advanced: "bg-purple-400",
+                            pro: "bg-amber-400",
+                          };
+
                           return (
                             <div
                               key={`mini-node-${node.topic.slug}`}
                               className={clsx(
-                                "absolute rounded-full",
-                                node.status === "completed"
-                                  ? "bg-emerald-300"
-                                  : node.status === "locked"
-                                    ? "bg-slate-500"
-                                    : "bg-cyan-300",
+                                "absolute rounded",
+                                levelColorMap[node.topic.level],
                               )}
                               style={{
                                 left: position.x * minimapMetrics.scale,
                                 top: position.y * minimapMetrics.scale,
                                 width: Math.max(layout.cardWidth * minimapMetrics.scale, 4),
                                 height: Math.max(layout.cardHeight * minimapMetrics.scale, 4),
-                                opacity: node.status === "locked" ? 0.5 : 0.9,
+                                opacity: node.status === "locked" ? 0.35 : node.status === "completed" ? 1 : 0.75,
                               }}
                             />
                           );
