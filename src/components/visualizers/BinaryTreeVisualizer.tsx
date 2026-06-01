@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { InteractiveCanvas, type CanvasDragPayload } from "./InteractiveCanvas";
+import { VisualizationStepPanel, type StepTone, type VisualizationStep } from "./VisualizationStepPanel";
 
 type TreeNode = {
   value: number;
@@ -137,6 +138,48 @@ export function BinaryTreeVisualizer() {
   const [highlightedNodes, setHighlightedNodes] = useState<Set<number>>(new Set());
   const [isAnimating, setIsAnimating] = useState(false);
   const [positionOverrides, setPositionOverrides] = useState<Record<string, { x: number; y: number }>>({});
+  const [currentAction, setCurrentAction] = useState("Insert nodes or start an inorder traversal to study BST behavior.");
+  const [currentNode, setCurrentNode] = useState<number | null>(null);
+  const [currentPath, setCurrentPath] = useState<number[]>([]);
+  const [currentDepth, setCurrentDepth] = useState(0);
+  const [stepLog, setStepLog] = useState<VisualizationStep[]>([]);
+  const stepCounterRef = useRef(0);
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const addStep = useCallback((action: string, explanation: string, tone: StepTone) => {
+    stepCounterRef.current += 1;
+    const stepNumber = stepCounterRef.current;
+
+    setStepLog((previous) => [
+      ...previous,
+      {
+        id: `tree-step-${stepNumber}`,
+        stepNumber,
+        action,
+        explanation,
+        tone,
+      },
+    ]);
+  }, []);
+
+  const addDivider = useCallback((action: string, explanation: string, tone: StepTone = "round") => {
+    setStepLog((previous) => [
+      ...previous,
+      {
+        id: `tree-divider-${previous.length}-${Date.now()}`,
+        action,
+        explanation,
+        tone,
+        isDivider: true,
+      },
+    ]);
+  }, []);
+
+  const clearLog = useCallback(() => {
+    stepCounterRef.current = 0;
+    setStepLog([]);
+  }, []);
 
   const baseTree = useMemo(
     () => layoutTree(tree, TREE_SIDE_PADDING, TREE_WIDTH - TREE_SIDE_PADDING, 0),
@@ -158,7 +201,7 @@ export function BinaryTreeVisualizer() {
   );
 
   const insertValue = () => {
-    if (!newValue) {
+    if (!newValue || isAnimating) {
       return;
     }
 
@@ -167,9 +210,56 @@ export function BinaryTreeVisualizer() {
       return;
     }
 
+    const path: number[] = [];
+    let current = tree;
+    let parentValue: number | null = null;
+    let direction: "left" | "right" | "root" = "root";
+
+    while (current) {
+      path.push(current.value);
+      parentValue = current.value;
+
+      if (parsedValue < current.value) {
+        addStep(
+          `Compare ${parsedValue} with ${current.value}`,
+          `${parsedValue} is smaller, so BST rules move left to keep smaller values on the left side of each node.`,
+          "compare"
+        );
+        direction = "left";
+        current = current.left;
+      } else {
+        addStep(
+          `Compare ${parsedValue} with ${current.value}`,
+          `${parsedValue} is greater than or equal to ${current.value}, so BST rules move right to preserve sorted order.`,
+          "compare"
+        );
+        direction = "right";
+        current = current.right;
+      }
+    }
+
+    if (!tree) {
+      addStep(
+        `Insert ${parsedValue} as root`,
+        "The tree was empty, so the new value becomes the root and every future search will start here.",
+        "insert"
+      );
+    } else {
+      addStep(
+        `Insert ${parsedValue} as ${direction} child of ${parentValue}`,
+        `This is the first empty ${direction} branch on the search path, so the binary-search-tree ordering remains valid.`,
+        "insert"
+      );
+    }
+
     setTree((currentTree) => insertBST(currentTree, parsedValue));
     setPositionOverrides({});
     setNewValue("");
+    setHighlightedNodes(new Set([...path, parsedValue]));
+    setCurrentNode(parsedValue);
+    setCurrentPath([...path, parsedValue]);
+    setCurrentDepth(path.length);
+    setCurrentAction(`Inserted ${parsedValue} by following the BST comparison path.`);
   };
 
   const inorderTraversal = useCallback(async () => {
@@ -180,25 +270,78 @@ export function BinaryTreeVisualizer() {
     setIsAnimating(true);
     setTraversalResult([]);
     setHighlightedNodes(new Set());
+    setCurrentNode(null);
+    setCurrentPath([]);
+    setCurrentDepth(0);
+    setCurrentAction("Running inorder traversal (Left → Node → Right).");
+    addDivider(
+      "Inorder traversal started",
+      "In a binary search tree, visiting Left → Node → Right returns values in sorted order because every left subtree holds smaller values and every right subtree holds larger ones.",
+      "round"
+    );
+
     const result: number[] = [];
 
-    const traverse = async (node: TreeNode | undefined): Promise<void> => {
+    const traverse = async (node: TreeNode | undefined, path: number[]): Promise<void> => {
       if (!node) {
         return;
       }
 
-      await traverse(node.left);
+      const nextPath = [...path, node.value];
+      setCurrentNode(node.value);
+      setCurrentPath(nextPath);
+      setCurrentDepth(path.length);
+
+      if (node.left) {
+        setHighlightedNodes(new Set([node.value, node.left.value]));
+        addStep(
+          `Traverse left from ${node.value}`,
+          `Inorder always explores the left subtree first because those values must appear before ${node.value} in sorted order.`,
+          "traverse"
+        );
+        await sleep(450);
+      }
+
+      await traverse(node.left, nextPath);
+
       result.push(node.value);
       setHighlightedNodes(new Set([node.value]));
       setTraversalResult([...result]);
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      await traverse(node.right);
+      setCurrentNode(node.value);
+      setCurrentPath(nextPath);
+      addStep(
+        `Visit ${node.value}`,
+        `After the left subtree is finished, ${node.value} becomes the next smallest remaining value to output.`,
+        "visit"
+      );
+      await sleep(600);
+
+      if (node.right) {
+        setHighlightedNodes(new Set([node.value, node.right.value]));
+        addStep(
+          `Traverse right from ${node.value}`,
+          `Now the traversal explores the right subtree, where every value is larger than ${node.value}.`,
+          "explore"
+        );
+        await sleep(450);
+      }
+
+      await traverse(node.right, nextPath);
     };
 
-    await traverse(tree);
-    setHighlightedNodes(new Set());
+    await traverse(tree, []);
+    setHighlightedNodes(new Set(result));
+    setCurrentNode(null);
+    setCurrentPath([]);
+    setCurrentDepth(0);
+    setCurrentAction("Traversal complete.");
+    addDivider(
+      "Inorder traversal complete",
+      `Visited nodes in order: [${result.join(", ")}]. The sequence is sorted because the BST always stores smaller values left and larger values right.`,
+      "sorted"
+    );
     setIsAnimating(false);
-  }, [isAnimating, tree]);
+  }, [addDivider, addStep, isAnimating, tree]);
 
   const handleNodeDrag = useCallback(
     (nodeId: string, { dx, dy }: CanvasDragPayload) => {
@@ -332,6 +475,31 @@ export function BinaryTreeVisualizer() {
           </div>
         )}
       </InteractiveCanvas>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Current action</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentAction}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Focused node</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentNode ?? "None"}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Depth / level</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentDepth}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Traversal path</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentPath.length > 0 ? currentPath.join(" → ") : "No active path"}</div>
+        </div>
+      </div>
+
+      <VisualizationStepPanel
+        entries={stepLog}
+        onClear={clearLog}
+        emptyMessage="Insert a value or run inorder traversal to see how the tree chooses paths and visits nodes."
+      />
     </motion.div>
   );
 }

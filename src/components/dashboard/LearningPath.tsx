@@ -165,12 +165,6 @@ export default function LearningPath({
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!selectedSlug || !nodeMap.has(selectedSlug)) {
-      setSelectedSlug(prioritySlug);
-    }
-  }, [nodeMap, prioritySlug, selectedSlug]);
-
   const dependencyMaps = useMemo(() => {
     const incoming = new Map<string, string[]>();
     const outgoing = new Map<string, string[]>();
@@ -444,6 +438,9 @@ export default function LearningPath({
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 uppercase tracking-[0.18em] text-slate-200">
                       {filterTitle}
+                    </span>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                      Track: {levels.find((level) => level.id === currentLevel)?.title ?? "All"}
                     </span>
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
                       {statusCounts.completed} completed

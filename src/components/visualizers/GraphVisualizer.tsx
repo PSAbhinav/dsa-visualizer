@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { InteractiveCanvas, type CanvasDragPayload } from "./InteractiveCanvas";
+import { VisualizationStepPanel, type StepTone, type VisualizationStep } from "./VisualizationStepPanel";
 
 type NodeId = "A" | "B" | "C" | "D" | "E" | "F";
 
@@ -126,6 +127,47 @@ export function GraphVisualizer() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [traversalOrder, setTraversalOrder] = useState<NodeId[]>([]);
   const [algorithm, setAlgorithm] = useState<"bfs" | "dfs">("bfs");
+  const [currentNode, setCurrentNode] = useState<NodeId | null>(null);
+  const [currentFrontier, setCurrentFrontier] = useState<NodeId[]>([]);
+  const [currentLevel, setCurrentLevel] = useState(0);
+  const [currentEdge, setCurrentEdge] = useState<string | null>(null);
+  const [currentAction, setCurrentAction] = useState("Choose BFS or DFS to explore how the graph reveals neighbors.");
+  const [stepLog, setStepLog] = useState<VisualizationStep[]>([]);
+  const stepCounterRef = useRef(0);
+
+  const addStep = useCallback((action: string, explanation: string, tone: StepTone) => {
+    stepCounterRef.current += 1;
+    const stepNumber = stepCounterRef.current;
+
+    setStepLog((previous) => [
+      ...previous,
+      {
+        id: `graph-step-${stepNumber}`,
+        stepNumber,
+        action,
+        explanation,
+        tone,
+      },
+    ]);
+  }, []);
+
+  const addDivider = useCallback((action: string, explanation: string, tone: StepTone = "round") => {
+    setStepLog((previous) => [
+      ...previous,
+      {
+        id: `graph-divider-${previous.length}-${Date.now()}`,
+        action,
+        explanation,
+        tone,
+        isDivider: true,
+      },
+    ]);
+  }, []);
+
+  const clearLog = useCallback(() => {
+    stepCounterRef.current = 0;
+    setStepLog([]);
+  }, []);
 
   const nodeMap = useMemo(
     () =>
@@ -160,9 +202,20 @@ export function GraphVisualizer() {
     setVisitedNodes(new Set());
     setVisitedEdges(new Set());
     setTraversalOrder([]);
+    setCurrentFrontier(["A"]);
+    setCurrentNode(null);
+    setCurrentLevel(0);
+    setCurrentEdge(null);
+    setCurrentAction("Running breadth-first search.");
+    clearLog();
+    addDivider(
+      "BFS started",
+      "Breadth-first search uses a queue, so it explores the graph one layer at a time from the start node.",
+      "round"
+    );
 
     const visited = new Set<NodeId>(["A"]);
-    const queue: NodeId[] = ["A"];
+    const queue: Array<{ id: NodeId; depth: number }> = [{ id: "A", depth: 0 }];
     const order: NodeId[] = [];
 
     while (queue.length > 0) {
@@ -171,52 +224,139 @@ export function GraphVisualizer() {
         break;
       }
 
-      order.push(current);
+      order.push(current.id);
+      setCurrentNode(current.id);
+      setCurrentLevel(current.depth);
+      setCurrentFrontier(queue.map((entry) => entry.id));
       setVisitedNodes(new Set(order));
       setTraversalOrder([...order]);
+      addStep(
+        `Visit node ${current.id}`,
+        `BFS removes ${current.id} from the front of the queue because it was discovered earliest at layer ${current.depth}.`,
+        "visit"
+      );
       await sleep(650);
 
-      for (const edge of GRAPH_EDGES.filter((candidate) => candidate.from === current)) {
-        if (!visited.has(edge.to)) {
+      for (const edge of GRAPH_EDGES.filter((candidate) => candidate.from === current.id)) {
+        const alreadyVisited = visited.has(edge.to);
+        setCurrentEdge(`${edge.from} → ${edge.to}`);
+        setVisitedEdges((currentEdges) => new Set([...currentEdges, edge.id]));
+        addStep(
+          `Explore edge ${edge.from} → ${edge.to}`,
+          alreadyVisited
+            ? `${edge.to} was already discovered earlier, so BFS skips it to avoid revisiting the same node.`
+            : `${edge.to} is new, so BFS adds it to the queue to process after the rest of this layer.`,
+          "explore"
+        );
+        await sleep(260);
+
+        if (!alreadyVisited) {
           visited.add(edge.to);
-          queue.push(edge.to);
-          setVisitedEdges((currentEdges) => new Set([...currentEdges, edge.id]));
-          await sleep(260);
+          queue.push({ id: edge.to, depth: current.depth + 1 });
+          setCurrentFrontier(queue.map((entry) => entry.id));
         }
       }
     }
 
+    setCurrentAction("BFS complete.");
+    setCurrentNode(null);
+    setCurrentFrontier([]);
+    setCurrentEdge(null);
+    addDivider(
+      "BFS complete",
+      `Traversal order ${order.join(" → ")} shows how the queue expands outward level by level from A.`,
+      "sorted"
+    );
     setIsAnimating(false);
-  }, []);
+  }, [addDivider, addStep, clearLog]);
 
   const runDFS = useCallback(async () => {
     setIsAnimating(true);
     setVisitedNodes(new Set());
     setVisitedEdges(new Set());
     setTraversalOrder([]);
+    setCurrentFrontier([]);
+    setCurrentNode(null);
+    setCurrentLevel(0);
+    setCurrentEdge(null);
+    setCurrentAction("Running depth-first search.");
+    clearLog();
+    addDivider(
+      "DFS started",
+      "Depth-first search keeps following one branch until it cannot go deeper, then it backtracks to the most recent branching point.",
+      "round"
+    );
 
     const visited = new Set<NodeId>();
     const order: NodeId[] = [];
+    const stackPath: NodeId[] = [];
 
-    const dfs = async (nodeId: NodeId) => {
+    const dfs = async (nodeId: NodeId, depth: number): Promise<void> => {
       visited.add(nodeId);
       order.push(nodeId);
+      stackPath.push(nodeId);
+      setCurrentNode(nodeId);
+      setCurrentLevel(depth);
+      setCurrentFrontier([...stackPath]);
       setVisitedNodes(new Set(order));
       setTraversalOrder([...order]);
+      addStep(
+        `Visit node ${nodeId}`,
+        `DFS dives to depth ${depth}, keeping the current recursion path as ${stackPath.join(" → ")}.`,
+        "visit"
+      );
       await sleep(650);
 
       for (const neighbor of getNeighbors(nodeId)) {
-        if (!visited.has(neighbor)) {
-          setVisitedEdges((currentEdges) => new Set([...currentEdges, `${nodeId}-${neighbor}`]));
+        const edgeId = `${nodeId}-${neighbor}`;
+        setCurrentEdge(`${nodeId} → ${neighbor}`);
+        setVisitedEdges((currentEdges) => new Set([...currentEdges, edgeId]));
+
+        if (visited.has(neighbor)) {
+          addStep(
+            `Explore edge ${nodeId} → ${neighbor}`,
+            `${neighbor} was already visited, so DFS does not follow this edge again.`,
+            "explore"
+          );
           await sleep(260);
-          await dfs(neighbor);
+          continue;
         }
+
+        addStep(
+          `Follow edge ${nodeId} → ${neighbor}`,
+          `${neighbor} is unvisited, so DFS immediately goes deeper before checking the remaining neighbors of ${nodeId}.`,
+          "explore"
+        );
+        await sleep(260);
+        await dfs(neighbor, depth + 1);
+        setCurrentNode(nodeId);
+        setCurrentLevel(depth);
+        setCurrentFrontier([...stackPath]);
+        addStep(
+          `Backtrack to ${nodeId}`,
+          `After finishing ${neighbor}'s branch, DFS returns to ${nodeId} to continue with any unexplored edges.`,
+          "traverse"
+        );
+        await sleep(280);
       }
+
+      stackPath.pop();
+      setCurrentFrontier([...stackPath]);
     };
 
-    await dfs("A");
+    await dfs("A", 0);
+
+    setCurrentAction("DFS complete.");
+    setCurrentNode(null);
+    setCurrentFrontier([]);
+    setCurrentEdge(null);
+    addDivider(
+      "DFS complete",
+      `Traversal order ${order.join(" → ")} shows how depth-first search fully explores one branch before backtracking.`,
+      "sorted"
+    );
     setIsAnimating(false);
-  }, [getNeighbors]);
+  }, [addDivider, addStep, clearLog, getNeighbors]);
 
   const runAlgorithm = () => {
     void (algorithm === "bfs" ? runBFS() : runDFS());
@@ -238,6 +378,7 @@ export function GraphVisualizer() {
           <select
             value={algorithm}
             onChange={(event) => setAlgorithm(event.target.value as "bfs" | "dfs")}
+            disabled={isAnimating}
             className="rounded-lg border border-white/10 bg-gray-800 px-3 py-2 text-sm text-white"
           >
             <option value="bfs">BFS</option>
@@ -310,21 +451,22 @@ export function GraphVisualizer() {
 
               {nodes.map((node) => {
                 const isVisited = visitedNodes.has(node.id);
+                const isCurrent = currentNode === node.id;
                 return (
                   <motion.g
                     key={node.id}
                     data-draggable
                     data-node-id={node.id}
                     style={{ cursor: "grab", transformOrigin: `${node.x}px ${node.y}px` }}
-                    animate={{ scale: isVisited ? [1, 1.08, 1] : 1 }}
+                    animate={{ scale: isCurrent ? [1, 1.12, 1] : isVisited ? [1, 1.06, 1] : 1 }}
                     transition={{ duration: 0.35 }}
                   >
                     <motion.circle
                       cx={node.x}
                       cy={node.y}
                       r={NODE_RADIUS}
-                      fill={isVisited ? "rgba(168,85,247,0.38)" : "rgba(17,24,39,0.92)"}
-                      stroke={isVisited ? "#c084fc" : "rgba(255,255,255,0.2)"}
+                      fill={isCurrent ? "rgba(250,204,21,0.35)" : isVisited ? "rgba(168,85,247,0.38)" : "rgba(17,24,39,0.92)"}
+                      stroke={isCurrent ? "#facc15" : isVisited ? "#c084fc" : "rgba(255,255,255,0.2)"}
                       strokeWidth={2.6}
                     />
                     <text
@@ -344,6 +486,35 @@ export function GraphVisualizer() {
           </div>
         )}
       </InteractiveCanvas>
+
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Current action</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentAction}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Current node</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentNode ?? "None"}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Layer / depth</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentLevel}</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-gray-800/70 p-3">
+          <div className="text-[11px] uppercase tracking-[0.18em] text-gray-500">Frontier</div>
+          <div className="mt-2 text-sm font-medium text-white">{currentFrontier.length > 0 ? currentFrontier.join(" → ") : "Empty"}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-xl border border-white/10 bg-gray-800/70 p-3 text-sm text-gray-300">
+        <span className="font-semibold text-white">Latest edge:</span> {currentEdge ?? "No edge explored yet"}
+      </div>
+
+      <VisualizationStepPanel
+        entries={stepLog}
+        onClear={clearLog}
+        emptyMessage="Run BFS or DFS to watch node visits, edge exploration, and backtracking decisions appear here."
+      />
     </motion.div>
   );
 }
