@@ -494,8 +494,9 @@ export default function AuthenticatedDashboard({ user }: AuthenticatedDashboardP
           </div>
         </motion.section>
 
-        <motion.section custom={3} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 grid gap-6 lg:grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <div className={`min-h-[420px] p-2 ${glassCardClass}`}>
+        <motion.section custom={3} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 flex flex-col gap-6">
+          {/* Interactive Roadmap - Full Width */}
+          <div className={`w-full p-2 ${glassCardClass}`}>
             <LearningPath
               nodes={learningPathPreview.nodes}
               edges={learningPathPreview.edges}
@@ -505,26 +506,33 @@ export default function AuthenticatedDashboard({ user }: AuthenticatedDashboardP
             />
           </div>
 
-          <div className={`h-fit self-start p-6 ${glassCardClass}`}>
-            <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Learning path mini-view</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">See your place on the roadmap</h2>
-            <p className="mt-4 text-sm leading-7 text-slate-300">
-              Your current position is highlighted in the roadmap preview, making it easy to understand what is done, what is unlocked, and what comes next.
-            </p>
+          {/* Learning Path Mini-View - Below the roadmap */}
+          <div className={`w-full p-6 ${glassCardClass}`}>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex-1">
+                <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Learning path mini-view</p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">See your place on the roadmap</h2>
+                <p className="mt-4 text-sm leading-7 text-slate-300">
+                  Your current position is highlighted in the roadmap preview, making it easy to understand what is done, what is unlocked, and what comes next.
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center lg:flex-col xl:flex-row">
+                <div className="rounded-2xl border border-white/10 bg-black/20 p-5 min-w-[240px]">
+                  <p className="text-sm text-slate-400">Current focus</p>
+                  <p className="mt-2 text-xl font-semibold text-white">{continueTopic.title}</p>
+                  <p className="mt-2 text-sm text-slate-300 line-clamp-2">{recommendedTopics[0]?.primaryReason ?? "You are on a strong path — keep stacking wins."}</p>
+                </div>
 
-            <div className="mt-6 rounded-2xl border border-white/10 bg-black/20 p-5">
-              <p className="text-sm text-slate-400">Current focus</p>
-              <p className="mt-2 text-xl font-semibold text-white">{continueTopic.title}</p>
-              <p className="mt-2 text-sm text-slate-300">{recommendedTopics[0]?.primaryReason ?? "You are on a strong path — keep stacking wins."}</p>
+                <Link
+                  href="/learning-path"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-cyan-300/60 hover:text-cyan-200 whitespace-nowrap"
+                >
+                  Open full learning path
+                  <FiArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             </div>
-
-            <Link
-              href="/learning-path"
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-cyan-300/60 hover:text-cyan-200"
-            >
-              Open full learning path
-              <FiArrowRight className="h-4 w-4" />
-            </Link>
           </div>
         </motion.section>
 

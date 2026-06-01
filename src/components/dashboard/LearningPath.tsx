@@ -658,12 +658,12 @@ export default function LearningPath({
                         {/* SVG Definitions for gradients and filters */}
                         <defs>
                           <linearGradient id="recommendedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="rgba(251,191,36,0.95)" />
-                            <stop offset="50%" stopColor="rgba(245,158,11,1)" />
-                            <stop offset="100%" stopColor="rgba(251,191,36,0.95)" />
+                            <stop offset="0%" stopColor="rgba(34,211,238,0.9)" />
+                            <stop offset="50%" stopColor="rgba(56,189,248,1)" />
+                            <stop offset="100%" stopColor="rgba(34,211,238,0.9)" />
                           </linearGradient>
                           <filter id="recommendedGlow" x="-50%" y="-50%" width="200%" height="200%">
-                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feGaussianBlur stdDeviation="2.5" result="blur" />
                             <feMerge>
                               <feMergeNode in="blur" />
                               <feMergeNode in="SourceGraphic" />
@@ -676,68 +676,58 @@ export default function LearningPath({
                           const edgeStyle =
                             pathItem.visualState === "completed"
                               ? {
-                                  stroke: "rgba(52,211,153,0.7)",
-                                  glow: "rgba(52,211,153,0.15)",
-                                  strokeWidth: 2.5,
+                                  stroke: "rgba(52,211,153,0.5)",
+                                  glow: "rgba(52,211,153,0.1)",
+                                  strokeWidth: 2,
                                   dashArray: undefined,
                                 }
                               : pathItem.visualState === "active"
                                 ? {
-                                    stroke: "rgba(34,211,238,0.6)",
-                                    glow: "rgba(34,211,238,0.12)",
-                                    strokeWidth: 2,
-                                    dashArray: "8 8",
+                                    stroke: "rgba(148,163,184,0.4)",
+                                    glow: "rgba(148,163,184,0.08)",
+                                    strokeWidth: 1.8,
+                                    dashArray: "6 6",
                                   }
                                 : {
-                                    stroke: "rgba(148,163,184,0.25)",
-                                    glow: "rgba(148,163,184,0.04)",
-                                    strokeWidth: 1.8,
-                                    dashArray: "4 10",
+                                    stroke: "rgba(148,163,184,0.2)",
+                                    glow: "rgba(148,163,184,0.03)",
+                                    strokeWidth: 1.5,
+                                    dashArray: "3 8",
                                   };
 
                           return (
                             <g key={`${pathItem.from}-${pathItem.to}`}>
-                              <path d={pathItem.path} fill="none" stroke={edgeStyle.glow} strokeWidth={edgeStyle.strokeWidth + 4} strokeLinecap="round" />
-                              <motion.path
+                              <path d={pathItem.path} fill="none" stroke={edgeStyle.glow} strokeWidth={edgeStyle.strokeWidth + 3} strokeLinecap="round" />
+                              <path
                                 d={pathItem.path}
                                 fill="none"
                                 stroke={edgeStyle.stroke}
                                 strokeWidth={edgeStyle.strokeWidth}
                                 strokeLinecap="round"
                                 strokeDasharray={edgeStyle.dashArray}
-                                animate={
-                                  pathItem.visualState === "active"
-                                    ? { strokeDashoffset: [0, -32] }
-                                    : { strokeDashoffset: 0 }
-                                }
-                                transition={
-                                  pathItem.visualState === "active"
-                                    ? { duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }
-                                    : { duration: 0 }
-                                }
                               />
                             </g>
                           );
                         })}
                         
-                        {/* Render recommended path on top with golden highlight */}
+                        {/* Render recommended path on top with subtle cyan highlight */}
                         {layout.paths.filter(p => recommendedPath.has(p.edgeKey)).map((pathItem) => {
                           return (
                             <g key={`recommended-${pathItem.from}-${pathItem.to}`}>
-                              {/* Outer glow */}
+                              {/* Soft outer glow */}
                               <path 
                                 d={pathItem.path} 
                                 fill="none" 
-                                stroke="rgba(251,191,36,0.3)" 
-                                strokeWidth={16} 
+                                stroke="rgba(34,211,238,0.15)" 
+                                strokeWidth={12} 
                                 strokeLinecap="round"
                               />
                               {/* Inner glow */}
                               <path 
                                 d={pathItem.path} 
                                 fill="none" 
-                                stroke="rgba(251,191,36,0.5)" 
-                                strokeWidth={10} 
+                                stroke="rgba(34,211,238,0.3)" 
+                                strokeWidth={6} 
                                 strokeLinecap="round"
                               />
                               {/* Main path with gradient */}
@@ -745,32 +735,21 @@ export default function LearningPath({
                                 d={pathItem.path}
                                 fill="none"
                                 stroke="url(#recommendedGradient)"
-                                strokeWidth={4.5}
+                                strokeWidth={3}
                                 strokeLinecap="round"
                                 filter="url(#recommendedGlow)"
                               />
-                              {/* Animated particles along the path */}
-                              <motion.circle
-                                r={5}
-                                fill="rgba(251,191,36,1)"
-                                filter="url(#recommendedGlow)"
+                              {/* Single subtle animated dot */}
+                              <circle
+                                r={4}
+                                fill="rgba(34,211,238,0.9)"
                               >
                                 <animateMotion
-                                  dur="2.5s"
+                                  dur="3s"
                                   repeatCount="indefinite"
                                   path={pathItem.path}
                                 />
-                              </motion.circle>
-                              <motion.circle
-                                r={3}
-                                fill="rgba(255,255,255,0.9)"
-                              >
-                                <animateMotion
-                                  dur="2.5s"
-                                  repeatCount="indefinite"
-                                  path={pathItem.path}
-                                />
-                              </motion.circle>
+                              </circle>
                             </g>
                           );
                         })}
@@ -891,7 +870,7 @@ export default function LearningPath({
                               key={`mini-recommended-${pathItem.from}-${pathItem.to}`}
                               d={pathItem.path}
                               fill="none"
-                              stroke="rgba(251,191,36,0.9)"
+                              stroke="rgba(34,211,238,0.9)"
                               strokeWidth={2}
                               transform={`scale(${minimapMetrics.scale})`}
                             />
@@ -942,16 +921,16 @@ export default function LearningPath({
                   ) : null}
 
                   {/* Recommended path legend */}
-                  <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-4">
-                    <div className="flex items-center gap-2 rounded-full border border-amber-400/30 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] backdrop-blur-xl">
-                      <div className="relative h-3 w-6">
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 opacity-80" />
-                        <div className="absolute left-0 top-1/2 h-1.5 w-1.5 -translate-y-1/2 animate-pulse rounded-full bg-white" />
+                  <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-3">
+                    <div className="flex items-center gap-2 rounded-full border border-cyan-400/30 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] backdrop-blur-xl">
+                      <div className="relative h-2.5 w-5">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-400 via-sky-300 to-cyan-400 opacity-90" />
+                        <div className="absolute left-0 top-1/2 h-1 w-1 -translate-y-1/2 animate-pulse rounded-full bg-white" />
                       </div>
-                      <span className="text-amber-300">Best path</span>
+                      <span className="text-cyan-300">Recommended</span>
                     </div>
-                    <div className="rounded-full border border-white/10 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300 backdrop-blur-xl">
-                      Scroll to zoom · drag to pan
+                    <div className="rounded-full border border-white/10 bg-slate-950/90 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 backdrop-blur-xl">
+                      Scroll · drag · pinch
                     </div>
                   </div>
                 </div>
