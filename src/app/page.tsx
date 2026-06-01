@@ -143,11 +143,11 @@ function TypewriterCode() {
           </div>
         </div>
 
-        <pre className="overflow-x-auto text-sm leading-7 text-slate-200 sm:text-[15px]">
+        <pre className="overflow-x-auto text-sm leading-7 text-slate-200 sm:text-[15px]" style={{ fontVariantLigatures: "none" }}>
           {typedText.split("\n").map((line, index) => (
             <div key={`${line}-${index}`} className="flex">
               <span className="mr-4 select-none text-right text-xs text-slate-500 sm:w-6">{String(index + 1).padStart(2, "0")}</span>
-              <span className="whitespace-pre-wrap break-words font-mono">{line || " "}</span>
+              <span className="whitespace-pre-wrap break-words font-mono" style={{ fontVariantLigatures: "none", fontFeatureSettings: "'liga' 0, 'clig' 0" }}>{line || " "}</span>
             </div>
           ))}
           <motion.span
@@ -451,83 +451,7 @@ function LandingPage() {
         </motion.button>
       </section>
 
-      <section className="relative mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          className="space-y-6"
-        >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">
-                {hasStarted ? "Continue learning" : "Personalized starting point"}
-              </p>
-              <h2 className="mt-2 text-3xl font-bold sm:text-4xl">
-                {hasStarted ? "Recommendations tuned to your progress" : "A gentle roadmap for your first wins"}
-              </h2>
-              <p className="mt-3 max-w-3xl text-lg text-slate-300">
-                {hasStarted
-                  ? "We look at completed topics, quiz results, and dependencies to suggest the most valuable next concept."
-                  : "No history yet? We will start you with the highest-leverage concepts and explain exactly what they unlock next."}
-              </p>
-            </div>
-            <Link
-              href="/learning-path"
-              className="inline-flex rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white backdrop-blur-xl transition hover:border-cyan-300/60 hover:text-cyan-200"
-            >
-              Open full learning path
-            </Link>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-            <NextTopicCard recommendations={recommendedTopics} />
-
-            <div className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-              <div>
-                <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Top 3 next topics</p>
-                <h3 className="mt-2 text-2xl font-semibold text-white">Why these suggestions ranked highly</h3>
-              </div>
-              <div className="space-y-4">
-                {recommendedTopics.slice(0, 3).map((recommendation, index) => (
-                  <div key={recommendation.topic.slug} className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">#{index + 1} recommendation</p>
-                        <p className="mt-1 text-lg font-semibold text-white">{recommendation.topic.title}</p>
-                      </div>
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                        {recommendation.shouldRevisit ? "Revisit" : recommendation.unlocked ? "Unlocked" : "In queue"}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm text-slate-300">{recommendation.primaryReason}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div>
-                <p className="text-sm uppercase tracking-[0.28em] text-cyan-300">Encouraging notifications</p>
-                <div className="mt-3 space-y-3">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-50">
-                      {notification.message}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <LearningPath
-            nodes={learningPathPreview.nodes}
-            edges={learningPathPreview.edges}
-            progressPercentage={learningPathPreview.progressPercentage}
-            preview
-            levelFilter={selectedLevel ?? "all"}
-          />
-        </motion.div>
-      </section>
-
+      {/* Features section - shown to all visitors */}
       <motion.section
         id="features"
         ref={featuresRef}

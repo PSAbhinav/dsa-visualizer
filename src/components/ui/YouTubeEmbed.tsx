@@ -45,6 +45,36 @@ function resolveYouTubeVideoId(value: string): string | null {
   }
 }
 
+// Hook to detect if page is visible (not in background tab/minimized)
+function usePageVisibility() {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(document.visibilityState === "visible");
+    };
+
+    // Also track window focus/blur for additional safety
+    const handleFocus = () => setIsVisible(true);
+    const handleBlur = () => setIsVisible(false);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
+    // Set initial state
+    setIsVisible(document.visibilityState === "visible" && document.hasFocus());
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
+  return isVisible;
+}
+
 export function YouTubeEmbed({
   video,
   watched = false,
@@ -61,6 +91,9 @@ export function YouTubeEmbed({
     completedAt: progress?.completedAt,
   }));
   const completionNotifiedRef = useRef(Boolean(progress?.completedAt) || watched);
+  const isPageVisible = usePageVisibility();
+  const accumulatedSecondsRef = useRef(0);
+  const lastTickRef = useRef<number | null>(null);
 
   const thumbnailUrl = useMemo(
     () => `https://i.ytimg.com/vi/${normalizedVideoId ?? video.id}/hqdefault.jpg`,
@@ -79,22 +112,39 @@ export function YouTubeEmbed({
     [normalizedVideoId, video.id]
   );
 
-  // Simulate progress tracking (since we can't access iframe internals reliably)
+  // Progress tracking - ONLY counts when page is visible
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying) {
+      lastTickRef.current = null;
+      return;
+    }
 
-    // Start tracking watch time
-    const startTime = Date.now();
-    const videoDurationEstimate = 600; // Assume ~10 min average video
+    const videoDurationEstimate = 600; // ~10 min average video
     
     const interval = setInterval(() => {
-      const elapsedSeconds = (Date.now() - startTime) / 1000;
-      const estimatedPercentage = Math.min(100, (elapsedSeconds / videoDurationEstimate) * 100);
+      const now = Date.now();
+      
+      // Only count time if page is visible
+      if (isPageVisible && document.visibilityState === "visible") {
+        if (lastTickRef.current !== null) {
+          const deltaSeconds = (now - lastTickRef.current) / 1000;
+          // Only add reasonable deltas (prevent huge jumps if visibility changed)
+          if (deltaSeconds > 0 && deltaSeconds <= 10) {
+            accumulatedSecondsRef.current += deltaSeconds;
+          }
+        }
+        lastTickRef.current = now;
+      } else {
+        // Page not visible - don't count time, reset lastTick
+        lastTickRef.current = null;
+      }
+
+      const estimatedPercentage = Math.min(100, (accumulatedSecondsRef.current / videoDurationEstimate) * 100);
       
       const newProgress = sanitizeVideoProgressEntry({
         videoId: video.id,
         watchedPercentage: Math.max(watchMetrics.watchedPercentage, estimatedPercentage),
-        playbackSpeed: 1, // Assume 1x for iframe
+        playbackSpeed: 1,
         completedAt: estimatedPercentage >= MIN_VIDEO_COMPLETION_PERCENTAGE ? new Date().toISOString() : undefined,
       }, progress);
 
@@ -113,7 +163,7 @@ export function YouTubeEmbed({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, video.id, watchMetrics.watchedPercentage, onProgressChange, onComplete, progress]);
+  }, [isPlaying, isPageVisible, video.id, watchMetrics.watchedPercentage, onProgressChange, onComplete, progress]);
 
   const handlePlay = useCallback(() => {
     if (!normalizedVideoId) return;
