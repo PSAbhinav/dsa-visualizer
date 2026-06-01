@@ -2,24 +2,13 @@
 
 import { motion } from "framer-motion";
 import { signIn, useSession } from "next-auth/react";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { FiBarChart2, FiCalendar, FiClock, FiRefreshCcw, FiTarget, FiTrendingUp } from "react-icons/fi";
 import { HiMiniFire } from "react-icons/hi2";
-import LearningPath from "@/components/dashboard/LearningPath";
-import NextTopicCard from "@/components/dashboard/NextTopicCard";
 import { StreakCalendar } from "@/components/profile/StreakCalendar";
 import { TopicProgressCard } from "@/components/profile/TopicProgressCard";
 import { levels, topics } from "@/data/topics";
 import { calculateTopicCompletion, formatLearningTime, getMilestoneMessage, isTopicMastered } from "@/hooks/useProgressTracker";
-import {
-  buildLearningNotifications,
-  buildLearningPathModel,
-  estimateCurrentLevelCompletionMinutes,
-  formatDuration,
-  getRecommendedTopics,
-  getWeakAreasToRevisit,
-} from "@/lib/recommendationEngine";
 import { getCoreVideoIds } from "@/lib/videoProgress";
 import { useStore } from "@/store/useStore";
 
@@ -57,20 +46,11 @@ function formatDate(value?: string) {
 export default function ProfilePage() {
   const { data: session } = useSession();
   // Use individual selectors to prevent hydration issues with Map fields
-  const selectedLevel = useStore((state) => state.selectedLevel);
-  const completedTopics = useStore((state) => state.completedTopics ?? []);
   const topicProgress = useStore((state) => state.topicProgress ?? {});
   const learningStats = useStore((state) => state.learningStats);
   const dailyStreak = useStore((state) => state.dailyStreak);
   const activityLog = useStore((state) => state.activityLog ?? {});
   const problemHistory = useStore((state) => state.problemHistory ?? []);
-  const conceptMastery = useStore((state) => {
-    try {
-      return state.conceptMastery ?? new Map();
-    } catch {
-      return new Map();
-    }
-  });
   const resetProgress = useStore((state) => state.resetProgress);
   const [memberSince] = useState(() => {
     const seededDate = new Date();
@@ -156,22 +136,6 @@ export default function ProfilePage() {
         : false
     );
   }, [dailyStreak.currentStreak, inProgressTopics, learningStats.topicsCompleted]);
-
-  const recommendationContext = useMemo(
-    () => ({ selectedLevel, completedTopics, topicProgress, problemHistory, conceptMastery }),
-    [completedTopics, conceptMastery, problemHistory, selectedLevel, topicProgress]
-  );
-  const suggestedTopics = useMemo(() => getRecommendedTopics(recommendationContext, 5), [recommendationContext]);
-  const weakAreas = useMemo(() => getWeakAreasToRevisit(recommendationContext, 3), [recommendationContext]);
-  const estimatedLevelCompletion = useMemo(
-    () => estimateCurrentLevelCompletionMinutes(recommendationContext),
-    [recommendationContext]
-  );
-  const learningPathPreview = useMemo(
-    () => buildLearningPathModel(recommendationContext, { levelFilter: selectedLevel ?? "all" }),
-    [recommendationContext, selectedLevel]
-  );
-  const notifications = useMemo(() => buildLearningNotifications(recommendationContext), [recommendationContext]);
 
   if (!session) {
     return (
@@ -359,80 +323,7 @@ export default function ProfilePage() {
         </div>
       </motion.section>
 
-      <motion.section custom={2} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8 space-y-6">
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <NextTopicCard recommendations={suggestedTopics} />
-
-          <div className={`space-y-6 p-6 ${glassCardClass}`}>
-            <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Suggested next steps</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Personalized guidance from your current data</h2>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-slate-400">Current level</p>
-                <p className="mt-2 text-xl font-semibold text-white capitalize">{selectedLevel ?? "beginner"}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-slate-400">Time to finish level</p>
-                <p className="mt-2 text-xl font-semibold text-white">{formatDuration(estimatedLevelCompletion)}</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-slate-400">Top suggestion</p>
-                <p className="mt-2 text-xl font-semibold text-white">{suggestedTopics[0]?.topic.title ?? "Arrays"}</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Encouraging notifications</p>
-              <div className="mt-3 space-y-3">
-                {notifications.map((notification) => (
-                  <div key={notification.id} className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-50">
-                    {notification.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm uppercase tracking-[0.28em] text-purple-200/60">Weak areas to revisit</p>
-                <Link href="/learning-path" className="text-sm font-semibold text-cyan-300 transition hover:text-cyan-200">
-                  View roadmap →
-                </Link>
-              </div>
-              <div className="mt-3 space-y-3">
-                {weakAreas.length > 0 ? (
-                  weakAreas.map((area) => (
-                    <div key={area.topic.slug} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-lg font-semibold text-white">{area.topic.title}</p>
-                        <span className="rounded-full bg-amber-400/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-200">
-                          {area.quizScore}% quiz score
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-300">{area.primaryReason}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-4 text-sm text-slate-400">
-                    No weak areas detected right now — keep pushing your strongest track forward.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <LearningPath
-          nodes={learningPathPreview.nodes}
-          edges={learningPathPreview.edges}
-          progressPercentage={learningPathPreview.progressPercentage}
-          preview
-          levelFilter={selectedLevel ?? "all"}
-        />
-
+      <motion.section custom={2} initial="hidden" animate="visible" variants={sectionVariants} className="mt-8">
         <StreakCalendar activityLog={activityLog} topicTitlesBySlug={topicTitlesBySlug} />
       </motion.section>
 

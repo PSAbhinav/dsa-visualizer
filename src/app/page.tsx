@@ -1,14 +1,16 @@
 "use client";
 
 import { AnimatePresence, animate, motion, useAnimation, useInView, useScroll, useTransform, type Variants } from "framer-motion";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaArrowDown, FaChartLine, FaCode, FaGithub, FaPlayCircle, FaPuzzlePiece } from "react-icons/fa";
 import { HiMiniSquares2X2, HiSparkles } from "react-icons/hi2";
+import AuthenticatedDashboard from "@/components/home/AuthenticatedDashboard";
 import LearningPath from "@/components/dashboard/LearningPath";
 import NextTopicCard from "@/components/dashboard/NextTopicCard";
 import { FloatingParticles } from "@/components/ui/AnimatedComponents";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { useToast } from "@/components/ui/Toast";
 import {
   buildLearningNotifications,
@@ -253,8 +255,7 @@ function RotatingQuote() {
   );
 }
 
-export default function HomePage() {
-  const router = useRouter();
+function LandingPage() {
   const { success } = useToast();
   const selectedLevel = useStore((state) => state.selectedLevel);
   const completedTopics = useStore((state) => state.completedTopics ?? []);
@@ -397,15 +398,15 @@ export default function HomePage() {
             <motion.div variants={fadeUp} className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
               <motion.button
                 type="button"
-                onClick={() => router.push("/topics")}
+                onClick={() => signIn("google")}
                 whileHover={{ scale: 1.03, y: -2, boxShadow: "0px 0px 35px rgba(139,92,246,0.45)" }}
                 whileTap={{ scale: 0.98 }}
                 animate={{ scale: [1, 1.04, 1], boxShadow: ["0px 0px 0px rgba(139,92,246,0.25)", "0px 0px 28px rgba(139,92,246,0.55)", "0px 0px 0px rgba(139,92,246,0.25)"] }}
                 transition={{ duration: 2.4, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
                 className="inline-flex items-center justify-center gap-3 rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 px-7 py-4 text-base font-semibold text-white"
               >
-                Start Learning
-                <span className="rounded-full bg-white/15 px-2 py-1 text-xs uppercase tracking-[0.25em]">Now</span>
+                Sign up free
+                <span className="rounded-full bg-white/15 px-2 py-1 text-xs uppercase tracking-[0.25em]">Google</span>
               </motion.button>
 
               <motion.button
@@ -640,4 +641,18 @@ export default function HomePage() {
       </footer>
     </motion.main>
   );
+}
+
+export default function HomePage() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") {
+    return <LoadingSpinner fullScreen label="Loading your dashboard..." />;
+  }
+
+  if (session?.user) {
+    return <AuthenticatedDashboard user={session.user} />;
+  }
+
+  return <LandingPage />;
 }
