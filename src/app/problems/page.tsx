@@ -32,7 +32,9 @@ const statusOrder = { solved: 0, attempted: 1, unsolved: 2 } as const;
 
 export default function ProblemsPage() {
   const router = useRouter();
-  const { selectedLevel, problemHistory } = useStore();
+  // Use individual selectors for better hydration handling
+  const selectedLevel = useStore((state) => state.selectedLevel);
+  const problemHistory = useStore((state) => state.problemHistory ?? []);
   const [searchTerm, setSearchTerm] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("All");
   const [topicFilter, setTopicFilter] = useState("All topics");

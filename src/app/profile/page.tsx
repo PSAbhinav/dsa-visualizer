@@ -55,17 +55,22 @@ function formatDate(value?: string) {
 
 export default function ProfilePage() {
   const { data: session } = useSession();
-  const {
-    selectedLevel,
-    completedTopics,
-    topicProgress,
-    learningStats,
-    dailyStreak,
-    activityLog,
-    problemHistory,
-    conceptMastery,
-    resetProgress,
-  } = useStore();
+  // Use individual selectors to prevent hydration issues with Map fields
+  const selectedLevel = useStore((state) => state.selectedLevel);
+  const completedTopics = useStore((state) => state.completedTopics ?? []);
+  const topicProgress = useStore((state) => state.topicProgress ?? {});
+  const learningStats = useStore((state) => state.learningStats);
+  const dailyStreak = useStore((state) => state.dailyStreak);
+  const activityLog = useStore((state) => state.activityLog ?? {});
+  const problemHistory = useStore((state) => state.problemHistory ?? []);
+  const conceptMastery = useStore((state) => {
+    try {
+      return state.conceptMastery ?? new Map();
+    } catch {
+      return new Map();
+    }
+  });
+  const resetProgress = useStore((state) => state.resetProgress);
   const [memberSince] = useState(() => {
     const seededDate = new Date();
     seededDate.setDate(seededDate.getDate() - 30);

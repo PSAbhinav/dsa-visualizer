@@ -17,7 +17,18 @@ const pageCardClass =
   "rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_80px_-30px_rgba(34,211,238,0.35)] backdrop-blur-2xl";
 
 export default function LearningPathPage() {
-  const { selectedLevel, completedTopics, topicProgress, problemHistory, conceptMastery } = useStore();
+  // Use individual selectors to prevent hydration issues with Map fields
+  const selectedLevel = useStore((state) => state.selectedLevel);
+  const completedTopics = useStore((state) => state.completedTopics ?? []);
+  const topicProgress = useStore((state) => state.topicProgress ?? {});
+  const problemHistory = useStore((state) => state.problemHistory ?? []);
+  const conceptMastery = useStore((state) => {
+    try {
+      return state.conceptMastery ?? new Map();
+    } catch {
+      return new Map();
+    }
+  });
   const [levelFilter, setLevelFilter] = useState<Level | "all">("all");
 
   const recommendationContext = useMemo(

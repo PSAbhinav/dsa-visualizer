@@ -33,14 +33,16 @@ export default function TopicQuizPage() {
       return 0;
     }
   });
-  const quizHistory = useStore((state) => {
+  // Get quizHistory once, then memoize filtering to prevent infinite re-renders
+  const allQuizHistory = useStore((state) => state.quizHistory ?? []);
+  const quizHistory = useMemo(() => {
     if (!slug) return [];
     try {
-      return state.quizHistory?.filter?.((attempt) => attempt.topicSlug === slug) ?? [];
+      return allQuizHistory.filter((attempt) => attempt.topicSlug === slug);
     } catch {
       return [];
     }
-  });
+  }, [allQuizHistory, slug]);
   const recordQuizAttempt = useStore((state) => state.recordQuizAttempt);
 
   const totalQuestions = quiz?.questions.length ?? 0;
