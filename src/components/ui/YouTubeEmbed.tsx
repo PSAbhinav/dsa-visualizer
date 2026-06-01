@@ -103,19 +103,22 @@ export function YouTubeEmbed({
   const accumulatedSecondsRef = useRef(progress?.lastWatchedPosition ?? 0);
   const lastTickRef = useRef<number | null>(null);
   const videoDurationEstimate = 600; // ~10 min average
+  
+  // Store initial resume position in a ref so it doesn't cause re-renders
+  const initialResumePositionRef = useRef(Math.floor(progress?.lastWatchedPosition ?? 0));
 
   const thumbnailUrl = useMemo(
     () => `https://i.ytimg.com/vi/${normalizedVideoId ?? video.id}/hqdefault.jpg`,
     [normalizedVideoId, video.id]
   );
 
-  // Build embed URL with resume position
+  // Build embed URL with resume position - ONLY use initial position to prevent flickering
   const embedUrl = useMemo(() => {
     if (!normalizedVideoId) return null;
-    const startTime = Math.floor(progress?.lastWatchedPosition ?? watchMetrics.lastWatchedPosition ?? 0);
+    const startTime = initialResumePositionRef.current;
     const startParam = startTime > 5 ? `&start=${startTime - 2}` : '';
     return `https://www.youtube.com/embed/${normalizedVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1${startParam}`;
-  }, [normalizedVideoId, progress?.lastWatchedPosition, watchMetrics.lastWatchedPosition]);
+  }, [normalizedVideoId]); // Only depends on videoId, not on changing position
 
   const youtubeUrl = useMemo(
     () => `https://www.youtube.com/watch?v=${normalizedVideoId ?? video.id}`,
@@ -156,32 +159,39 @@ export function YouTubeEmbed({
 
       const estimatedPercentage = Math.min(100, (accumulatedSecondsRef.current / videoDurationEstimate) * 100);
       
-      const newProgress = sanitizeVideoProgressEntry({
-        videoId: video.id,
-        watchedPercentage: Math.max(watchMetrics.watchedPercentage, estimatedPercentage),
-        playbackSpeed: 1, // Assume 1x for iframe (can't detect)
-        lastWatchedPosition: accumulatedSecondsRef.current,
-        videoDuration: videoDurationEstimate,
-        completedAt: estimatedPercentage >= MIN_VIDEO_COMPLETION_PERCENTAGE ? new Date().toISOString() : undefined,
-      }, progress);
-
-      setWatchMetrics({
-        watchedPercentage: newProgress.watchedPercentage,
-        playbackSpeed: newProgress.playbackSpeed,
-        completedAt: newProgress.completedAt,
-        lastWatchedPosition: newProgress.lastWatchedPosition ?? 0,
+      // Use functional update to avoid dependency on watchMetrics
+      setWatchMetrics(prev => {
+        const newWatchedPercentage = Math.max(prev.watchedPercentage, estimatedPercentage);
+        const isComplete = newWatchedPercentage >= MIN_VIDEO_COMPLETION_PERCENTAGE;
+        
+        const newMetrics = {
+          watchedPercentage: newWatchedPercentage,
+          playbackSpeed: 1,
+          completedAt: isComplete && !prev.completedAt ? new Date().toISOString() : prev.completedAt,
+          lastWatchedPosition: accumulatedSecondsRef.current,
+        };
+        
+        // Call onProgressChange with the new progress
+        const newProgress = sanitizeVideoProgressEntry({
+          videoId: video.id,
+          ...newMetrics,
+          videoDuration: videoDurationEstimate,
+        }, progress);
+        
+        onProgressChange?.(newProgress);
+        
+        // Check completion
+        if (isVideoProgressComplete(newProgress) && !completionNotifiedRef.current) {
+          completionNotifiedRef.current = true;
+          onComplete?.(video.id);
+        }
+        
+        return newMetrics;
       });
-
-      onProgressChange?.(newProgress);
-
-      if (isVideoProgressComplete(newProgress) && !completionNotifiedRef.current) {
-        completionNotifiedRef.current = true;
-        onComplete?.(video.id);
-      }
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, isPageVisible, video.id, watchMetrics.watchedPercentage, onProgressChange, onComplete, progress]);
+  }, [isPlaying, isPageVisible, video.id, onProgressChange, onComplete, progress]);
 
   const handlePlay = useCallback(() => {
     if (!normalizedVideoId) return;
